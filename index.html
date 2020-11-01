@@ -1,0 +1,700 @@
+<!doctype html>
+<head>
+  <title>RetinaGAN: An Object-aware Approach to Sim-to-Real Transfer</title>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1.0" />
+  <meta http-equiv="X-UA-Compatible" content="ie=edge" />
+  <link href='https://fonts.googleapis.com/css?family=Roboto:300' rel='stylesheet' type='text/css'>
+  <meta name="theme-color" content="#1a4067" />
+  <!-- Global site tag (gtag.js) - Google Analytics -->
+  <!-- <script async src="https://www.googletagmanager.com/gtag/js?id=UA-133908598-1"></script>
+  <script>
+    window.dataLayer = window.dataLayer || [];
+    function gtag(){dataLayer.push(arguments);}
+    gtag('js', new Date());
+    gtag('config', 'UA-133908598-1');
+  </script> -->
+  <!-- SEO -->
+  <meta property="og:title" content="RetinaGAN: An Object-aware Approach to Sim-to-Real Transfer" />
+  <meta property="og:type" content="article" />
+  <meta property="og:description" content="RetinaGAN solves sim-to-real for robotics tasks with object consistency." />
+  <!-- <meta property="og:image" content="https://retinagan.github.io/assets/img/planet_logo_rect.jpeg" /> -->
+  <meta property="og:url" content="https://retinagan.github.io/" />
+  <!-- Twitter Card data -->
+  <meta name="twitter:card" content="summary" />
+  <meta name="twitter:title" content="RetinaGAN: An Object-aware Approach to Sim-to-Real Transfer" />
+  <meta name="twitter:description" content="" />
+  <meta property="og:site_name" content="RetinaGAN solves sim-to-real for robotics tasks with object consistency." />
+  <!-- <meta name="twitter:image" content="https://retinagan.github.io/assets/img/planet_logo_square.jpeg" /> -->
+
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/KaTeX/0.5.1/katex.min.css">
+  <link rel="stylesheet" href="/style.css">
+</head>
+<body>
+
+<script src="lib/jquery-1.12.4.min.js"></script>
+<!--<script src="lib/mobile-detect.min.js"></script>-->
+<script src="lib/template.v1.js"></script>
+
+<div class="cover">
+  <h1 class="unselectable">RetinaGAN: <br>An Object-aware Approach to Sim-to-Real Transfer</h1>
+  <video src="assets/mp4/intro.mp4" autoplay loop playsinline muted></video>
+  <div class="hint unselectable">scroll down</div>
+</div>
+
+<dt-article id="dtbody">
+<dt-byline class="l-page transparent"></dt-byline>
+<h1>RetinaGAN: An Object-aware Approach to Sim-to-Real Transfer</h1>
+<dt-byline class="l-page" id="authors_section">
+<div class="byline">
+  <div class="authors">
+    <div class="author">
+        <a class="name" href="http://itsdanielho.com/">Daniel Ho</a>
+        <a class="affiliation" href="https://x.company/projects/everyday-robots/">Everyday Robots</a>
+    </div>
+    <div class="author">
+        <a class="name" href="https://research.google/people/KanishkaRao/">Kanishka Rao</a>
+        <a class="affiliation" href="https://research.google/teams/brain/robotics/">Robotics at Google</a>
+    </div>
+    <div class="author">
+        <a class="name">Zhuo Xu</a>
+        <a class="affiliation">UC Berkeley</a>
+    </div>
+    <div class="author">
+        <a class="name" href="http://evjang.com//">Eric Jang</a>
+        <a class="affiliation" href="https://research.google/teams/brain/robotics/">Robotics at Google</a>
+    </div>
+    <div class="author">
+        <a class="name">Mohi Khansari</a>
+        <a class="affiliation" href="https://x.company/projects/everyday-robots/">Everyday Robots</a>
+    </div>
+    <div class="author">
+        <a class="name" href="https://www.yunfei-bai.com/">Yunfei Bai</a>
+        <a class="affiliation" href="https://x.company/projects/everyday-robots/">Everyday Robots</a>
+    </div>
+  </div>
+  <div class="date">
+    <div class="month">Oct 31</div>
+    <div class="year">2020</div>
+  </div>
+  <div class="date">
+    <div class="month">Download</div>
+    <div class="year" style="color: #FF6C00;"><a href="https://arxiv.org/" target="_blank">WIP</a></div> </div>
+</div>
+</dt-byline>
+</dt-byline>
+<h2>Abstract</h2>
+<p>The success of deep reinforcement learning (RL) and imitation learning
+(IL) in vision-based robotic manipulation typically hinges on the
+expense of large scale data collection. With simulation, data to train
+a policy can be collected efficiently at scale, but the visual gap
+between sim and real makes deployment in the real world difficult. We
+introduce RetinaGAN, a generative adversarial network (GAN) approach
+to adapt simulated images to realistic ones with object-detection
+consistency. RetinaGAN is trained in an unsupervised manner without
+task loss dependencies, and preserves general object structure and
+texture in adapted images. We evaluate our method on three real world
+tasks: grasping, pushing, and door opening. RetinaGAN improves upon
+the performance of prior sim-to-real methods for RL-based object
+instance grasping and continues to be effective even in the limited
+data regime. When applied to a pushing task in a similar visual
+domain, RetinaGAN demonstrates transfer with no additional real data
+requirements. We also show our method bridges the visual gap for a
+novel door opening task using imitation learning in a new visual
+domain.</p>
+<hr>
+<h2>I. Introduction</h2>
+<p>Vision-based reinforcement learning and imitation learning methods incorporating deep neural network structure can express complex behaviors, and they solve robotics manipulation tasks in an end-to-end fashion <dt-cite key="levine2018learning,pinto2016supersizing,kalashnikov2018qtopt"></dt-cite>. These methods are able to generalize and scale on complicated robot manipulation tasks, though they require many hundreds of thousands of real world episodes which are costly to collect.</p>
+<div class="figure">
+<img src="assets/fig/GAN_F1.png" style="margin: 0; width: 100%;"/>
+<figcaption>
+Fig. 1. Overview of RetinaGAN pipeline. Left: Train RetinaGAN using pre-trained perception model to create a sim-to-real model. Right: Train the behavior policy model using the sim-to-real generated images. This policy can later be deployed in real.
+</figcaption>
+</div>
+<p>Some of this data collection effort can be mitigated by collecting these required episodes in simulation and applying sim-to-real transfer methods. Simulation provides a safe, controlled platform for policy training and development with known ground truth labels. Such simulated data can be cheaply scaled. However, directly executing such a policy in the real world typically performs poorly, even if the simulation configuration is carefully controlled, because of visual and physical differences between the domains known as the reality gap. In practice, we find the visual difference to be the bottleneck in our learning algorithms and focus further discussion solely on this.</p>
+<p>One strategy to overcome the visual reality gap is pixel-level domain adaptation; such methods may employ generative adversarial networks to translate the synthetic images to the real world domain <dt-cite key="bousmalis2017unsupervised"></dt-cite>. However, a GAN may arbitrarily change the image, including removing information necessary for a given task. More broadly for robotic manipulation, it is important to preserve scene features that directly interact with the robot, like object-level structure and textures.</p>
+<p>To address this, we propose RetinaGAN, a domain adaptation technique which requires strong object semantic awareness through an object detection consistency loss. RetinaGAN involves a CycleGAN <dt-cite key="zhu2020unpaired"></dt-cite> that adapts simulated images to look more realistic while also resulting in consistent objects predictions. We leverage an object detector trained on both simulated and real domains to make predictions on original and translated images, and we enforce the invariant of the predictions with respect to the GAN translation.</p>
+<p>RetinaGAN is a general approach to adaptation which provides reliable sim-to-real transfer for tasks in diverse visual environments (Fig. 1). In a specific scenario, we show how RetinaGAN may be reused for a novel pushing task. We evaluate the performance of our method on three real world robotics tasks and demonstrate the following:</p>
+<ol>
+<li>
+<p>RetinaGAN, when trained on robotic grasping data, allows for grasping RL task models that outperform prior sim-to-real methods on real world grasping by 12%.</p>
+</li>
+<li>
+<p>With limited (5-10%) data, our method continues to work effectively for grasping, only suffering a 14% drop in performance.</p>
+</li>
+<li>
+<p>The RetinaGAN trained with grasping data may be reused for another similar task, 3D object pushing, without any additional real data. It achieves 90% success.</p>
+</li>
+<li>
+<p>We train RetinaGAN for a door opening imitation learning task in a drastically different environment, and we introduce an Ensemble-RetinaGAN method that adds more visual diversity to achieve 97% success rate.</p>
+</li>
+<li>
+<p>We utilize the same pre-trained object detector in all experiments.</p>
+</li>
+</ol>
+<h2>II. Related Work</h2>
+<p>To address the visual sim-to-reality gap, prior work commonly apply domain randomization and domain adaptation techniques.</p>
+<p>With domain randomization, a policy is trained with randomized simulation parameters and scene configurations which produce differences in visual appearance <dt-cite key="b8202133,matas2018simtoreal,James2017TransferringEV,b8578591,yan2019data,yan2018learning"></dt-cite>. The policy may learn to generalize across the parameter distribution and takes actions likely to work in all situations. Policy performance relies heavily on the kind of randomizations applied and whether they are close to or cover reality. The recently proposed method, Automatic Domain Randomization <dt-cite key="akkaya2019solving"></dt-cite>, automates the hyperparameter tuning process for Rubik's Cube manipulation. But, domain randomization still requires manual, task-specific selection of visual parameters like the scene, textures, and rendering.</p>
+<p>Domain adaptation bridges the reality gap by directly resolving differences between the domains <dt-cite key="b7078994"></dt-cite>. Images from a source domain can be modified at the pixel-level to resemble a target domain <dt-cite key="bousmalis2017unsupervised,yoo2016pixellevel"></dt-cite>. Or, feature-level adaptation aligns intermediate network features between the domains <dt-cite key="b6126344,pmlr-v37-long15,fang2018multi"></dt-cite>. GANs are a commonly applied method for pixel-level transfer which only require unpaired images from both domains <dt-cite key="NIPS2014_5423,brock2019large,zhu2020unpaired,bousmalis2018using,james2019sim"></dt-cite>. Our method employs such pixel-level adaptation to address the sim-to-real gap.</p>
+<p>Action Image  <dt-cite key="khansari2020action"></dt-cite> is another approach to bridge the sim-to-real gap through learning a domain invariant representation for the task of grasping. Our work is complementary to this work and can help to further reduce this gap.</p>
+<p>Among prior work that apply semantic consistency to GAN training, CyCADA <dt-cite key="hoffman2017cycada"></dt-cite> introduces a pixel-level perception consistency loss (semantic segmentation) as a direct task loss, and applies the learned generator to other semantic segmentation and perception tasks. Comparatively, RetinaGAN uses object detection where labels on real data is much easier to obtain and demonstrates that feature understanding from object detection is sufficient to preserve object semantics for robotics applications.</p>
+<p>Recently, RL-CycleGAN <dt-cite key="rao2020rlcyclegan"></dt-cite> extends vanilla CycleGAN <dt-cite key="zhu2020unpaired"></dt-cite> with an additional reinforcement learning task loss. RL-CycleGAN enforces consistency of task policy Q-values between the original and transferred images to preserve information important to a given task. RL-CycleGAN is trained jointly with the RL model and requires task-specific real world episodes collected via some preexisting policy. Comparatively, RetinaGAN works for supervised and imitation learning, as it uses object detection as a task-decoupled surrogate for object-level visual domain differences. This requires additional real-world bounding box labels, but the detector can be reused across robotics tasks. In practice, we find the RetinaGAN easier to train since the additional object detector is pre-trained and not jointly optimized.</p>
+<h2>III. Preliminaries</h2>
+<h3>A. Object Detection</h3>
+<div class="figure">
+<img src="assets/fig/GAN_perception.png" style="margin: 0; width: 100%;"/>
+<figcaption>
+Fig. 2. Sim and real perception data used to train EfficientDet focuses on scenes of disposable objects encountered in recycling stations. The real dataset includes 44,000 such labeled images and 37,000 images of objects on desks. The simulated dataset includes 625,000 total images.
+</figcaption>
+</div>
+<p>We leverage an object detection perception model to provide object awareness for the sim-to-real CycleGAN. We train the model by mixing simulated and real world datasets which contain ground-truth bounding box labels (illustrated in Fig. 2). The real world object detection dataset includes robot images collected in general robot operation; labeling granularity is based on general object type -- all brands of soda will be part of the &quot;can&quot; class. Simulation data is generated with the PyBullet physics engine <dt-cite key="coumans2017pybullet"></dt-cite>.</p>
+<p>Object detection models are object-aware but task-agnostic, and thus, they do not require task-specific data. We use this single detection network as a multi-domain model for all tasks, and we suspect in-domain detection training data is not crucial to the success of our method. Notably, the door opening domain is very different from the perception training data domain, and we demonstrate successful transfer in Section V-C.</p>
+<p>We select the EfficientDet-D1 <dt-cite key="efficientdet"></dt-cite> model architecture (using the same losses as  RetinaNet <dt-cite key="retinanet"></dt-cite>) for the object detector. EfficientDet passes an input RGB image through a backbone feedforward EfficientNet <dt-cite key="tan2020efficientnet"></dt-cite> architecture, and fuses features at multiple scales within a feature pyramid network. From the result, network heads predict class logit and bounding box regression targets.</p>
+<p>We note that it is also possible to train separate perception networks for each domain. However, this adds complexity and requires that the object sets between synthetic and real data be close to bijective, because both models would have to produce consistent predictions on perfectly paired images.</p>
+<p>While segmentation models like Mask-RCNN <dt-cite key="he2018mask"></dt-cite> and ShapeMask <dt-cite key="kuo2019shapemask"></dt-cite> provide dense, pixel-level object supervision, it is practically easier and more efficient to label object detection data. In general, perception models are common, and data collection and labeling efforts can be amortized across various use cases.</p>
+<h3>B. CycleGAN</h3>
+<p>The RetinaGAN training process builds on top of CycleGAN <dt-cite key="zhu2020unpaired"></dt-cite>: an approach to learn a bidirectional mapping between unpaired datasets of images from two domains, <span class="katex"><span class="katex-mathml"><math><semantics><mrow><mi>X</mi></mrow><annotation encoding="application/x-tex">X</annotation></semantics></math></span><span class="katex-html" aria-hidden="true"><span class="strut" style="height:0.68333em;"></span><span class="strut bottom" style="height:0.68333em;vertical-align:0em;"></span><span class="base textstyle uncramped"><span class="mord mathit" style="margin-right:0.07847em;">X</span></span></span></span> and <span class="katex"><span class="katex-mathml"><math><semantics><mrow><mi>Y</mi></mrow><annotation encoding="application/x-tex">Y</annotation></semantics></math></span><span class="katex-html" aria-hidden="true"><span class="strut" style="height:0.68333em;"></span><span class="strut bottom" style="height:0.68333em;vertical-align:0em;"></span><span class="base textstyle uncramped"><span class="mord mathit" style="margin-right:0.22222em;">Y</span></span></span></span>, with generators <span class="katex"><span class="katex-mathml"><math><semantics><mrow><mi>G</mi><mo>:</mo><mi>X</mi><mo>→</mo><mi>Y</mi></mrow><annotation encoding="application/x-tex">G: X \rightarrow Y</annotation></semantics></math></span><span class="katex-html" aria-hidden="true"><span class="strut" style="height:0.68333em;"></span><span class="strut bottom" style="height:0.68333em;vertical-align:0em;"></span><span class="base textstyle uncramped"><span class="mord mathit">G</span><span class="mrel">:</span><span class="mord mathit" style="margin-right:0.07847em;">X</span><span class="mrel">→</span><span class="mord mathit" style="margin-right:0.22222em;">Y</span></span></span></span> and <span class="katex"><span class="katex-mathml"><math><semantics><mrow><mi>F</mi><mo>:</mo><mi>Y</mi><mo>→</mo><mi>X</mi></mrow><annotation encoding="application/x-tex">F: Y \rightarrow X</annotation></semantics></math></span><span class="katex-html" aria-hidden="true"><span class="strut" style="height:0.68333em;"></span><span class="strut bottom" style="height:0.68333em;vertical-align:0em;"></span><span class="base textstyle uncramped"><span class="mord mathit" style="margin-right:0.13889em;">F</span><span class="mrel">:</span><span class="mord mathit" style="margin-right:0.22222em;">Y</span><span class="mrel">→</span><span class="mord mathit" style="margin-right:0.07847em;">X</span></span></span></span>. These generators are trained alongside adversarial discriminators <span class="katex"><span class="katex-mathml"><math><semantics><mrow><msub><mi>D</mi><mi>x</mi></msub><mo separator="true">,</mo><msub><mi>D</mi><mi>y</mi></msub></mrow><annotation encoding="application/x-tex">D_x, D_y</annotation></semantics></math></span><span class="katex-html" aria-hidden="true"><span class="strut" style="height:0.68333em;"></span><span class="strut bottom" style="height:0.969438em;vertical-align:-0.286108em;"></span><span class="base textstyle uncramped"><span class="mord"><span class="mord mathit" style="margin-right:0.02778em;">D</span><span class="vlist"><span style="top:0.15em;margin-right:0.05em;margin-left:-0.02778em;"><span class="fontsize-ensurer reset-size5 size5"><span style="font-size:0em;">​</span></span><span class="reset-textstyle scriptstyle cramped"><span class="mord mathit">x</span></span></span><span class="baseline-fix"><span class="fontsize-ensurer reset-size5 size5"><span style="font-size:0em;">​</span></span>​</span></span></span><span class="mpunct">,</span><span class="mord"><span class="mord mathit" style="margin-right:0.02778em;">D</span><span class="vlist"><span style="top:0.15em;margin-right:0.05em;margin-left:-0.02778em;"><span class="fontsize-ensurer reset-size5 size5"><span style="font-size:0em;">​</span></span><span class="reset-textstyle scriptstyle cramped"><span class="mord mathit" style="margin-right:0.03588em;">y</span></span></span><span class="baseline-fix"><span class="fontsize-ensurer reset-size5 size5"><span style="font-size:0em;">​</span></span>​</span></span></span></span></span></span>, which classify images to the correct domain, and with the cycle consistency loss capturing <span class="katex"><span class="katex-mathml"><math><semantics><mrow><mi>F</mi><mo>(</mo><mi>G</mi><mo>(</mo><mi>x</mi><mo>)</mo><mo>)</mo><mo>≈</mo><mi>x</mi><mo separator="true">,</mo><mi>G</mi><mo>(</mo><mi>F</mi><mo>(</mo><mi>y</mi><mo>)</mo><mo>≈</mo><mi>y</mi></mrow><annotation encoding="application/x-tex">F(G(x)) \approx x, G(F(y) \approx y</annotation></semantics></math></span><span class="katex-html" aria-hidden="true"><span class="strut" style="height:0.75em;"></span><span class="strut bottom" style="height:1em;vertical-align:-0.25em;"></span><span class="base textstyle uncramped"><span class="mord mathit" style="margin-right:0.13889em;">F</span><span class="mopen">(</span><span class="mord mathit">G</span><span class="mopen">(</span><span class="mord mathit">x</span><span class="mclose">)</span><span class="mclose">)</span><span class="mrel">≈</span><span class="mord mathit">x</span><span class="mpunct">,</span><span class="mord mathit">G</span><span class="mopen">(</span><span class="mord mathit" style="margin-right:0.13889em;">F</span><span class="mopen">(</span><span class="mord mathit" style="margin-right:0.03588em;">y</span><span class="mclose">)</span><span class="mrel">≈</span><span class="mord mathit" style="margin-right:0.03588em;">y</span></span></span></span> for <span class="katex"><span class="katex-mathml"><math><semantics><mrow><mi>x</mi><mo>∈</mo><mi>X</mi><mo separator="true">,</mo><mi>y</mi><mo>∈</mo><mi>Y</mi></mrow><annotation encoding="application/x-tex">x \in X, y \in Y</annotation></semantics></math></span><span class="katex-html" aria-hidden="true"><span class="strut" style="height:0.68333em;"></span><span class="strut bottom" style="height:0.8777699999999999em;vertical-align:-0.19444em;"></span><span class="base textstyle uncramped"><span class="mord mathit">x</span><span class="mrel">∈</span><span class="mord mathit" style="margin-right:0.07847em;">X</span><span class="mpunct">,</span><span class="mord mathit" style="margin-right:0.03588em;">y</span><span class="mrel">∈</span><span class="mord mathit" style="margin-right:0.22222em;">Y</span></span></span></span>. We can summarize the training process with the CycleGAN loss (described in detail in <dt-cite key="zhu2020unpaired,rao2020rlcyclegan"></dt-cite>):</p>
+<p><span class="katex-display"><span class="katex"><span class="katex-mathml"><math><semantics><mrow><msub><mrow><mi mathvariant="script">L</mi></mrow><mtext><mi mathvariant="normal">C</mi><mi mathvariant="normal">y</mi><mi mathvariant="normal">c</mi><mi mathvariant="normal">l</mi><mi mathvariant="normal">e</mi><mi mathvariant="normal">G</mi><mi mathvariant="normal">A</mi><mi mathvariant="normal">N</mi></mtext></msub><mo>(</mo><mi>G</mi><mo separator="true">,</mo><mi>F</mi><mo separator="true">,</mo><msub><mi>D</mi><mi>x</mi></msub><mo separator="true">,</mo><msub><mi>D</mi><mi>y</mi></msub><mo>)</mo><mo>=</mo></mrow><annotation encoding="application/x-tex">\mathcal{L}_\text{CycleGAN}(G, F, D_x, D_y) = 
+</annotation></semantics></math></span><span class="katex-html" aria-hidden="true"><span class="strut" style="height:0.75em;"></span><span class="strut bottom" style="height:1.036108em;vertical-align:-0.286108em;"></span><span class="base displaystyle textstyle uncramped"><span class=""><span class="mord displaystyle textstyle uncramped"><span class="mord mathcal">L</span></span><span class="vlist"><span style="top:0.15em;margin-right:0.05em;"><span class="fontsize-ensurer reset-size5 size5"><span style="font-size:0em;">​</span></span><span class="reset-textstyle scriptstyle cramped"><span class="text mord scriptstyle cramped"><span class="mord mathrm">C</span><span class="mord mathrm" style="margin-right:0.01389em;">y</span><span class="mord mathrm">c</span><span class="mord mathrm">l</span><span class="mord mathrm">e</span><span class="mord mathrm">G</span><span class="mord mathrm">A</span><span class="mord mathrm">N</span></span></span></span><span class="baseline-fix"><span class="fontsize-ensurer reset-size5 size5"><span style="font-size:0em;">​</span></span>​</span></span></span><span class="mopen">(</span><span class="mord mathit">G</span><span class="mpunct">,</span><span class="mord mathit" style="margin-right:0.13889em;">F</span><span class="mpunct">,</span><span class="mord"><span class="mord mathit" style="margin-right:0.02778em;">D</span><span class="vlist"><span style="top:0.15em;margin-right:0.05em;margin-left:-0.02778em;"><span class="fontsize-ensurer reset-size5 size5"><span style="font-size:0em;">​</span></span><span class="reset-textstyle scriptstyle cramped"><span class="mord mathit">x</span></span></span><span class="baseline-fix"><span class="fontsize-ensurer reset-size5 size5"><span style="font-size:0em;">​</span></span>​</span></span></span><span class="mpunct">,</span><span class="mord"><span class="mord mathit" style="margin-right:0.02778em;">D</span><span class="vlist"><span style="top:0.15em;margin-right:0.05em;margin-left:-0.02778em;"><span class="fontsize-ensurer reset-size5 size5"><span style="font-size:0em;">​</span></span><span class="reset-textstyle scriptstyle cramped"><span class="mord mathit" style="margin-right:0.03588em;">y</span></span></span><span class="baseline-fix"><span class="fontsize-ensurer reset-size5 size5"><span style="font-size:0em;">​</span></span>​</span></span></span><span class="mclose">)</span><span class="mrel">=</span></span></span></span></span></p>
+<p><span class="katex-display"><span class="katex"><span class="katex-mathml"><math><semantics><mrow><msub><mrow><mi mathvariant="script">L</mi></mrow><mtext><mi mathvariant="normal">G</mi><mi mathvariant="normal">A</mi><mi mathvariant="normal">N</mi></mtext></msub><mo>(</mo><mi>G</mi><mo separator="true">,</mo><msub><mi>D</mi><mi>Y</mi></msub><mo separator="true">,</mo><mi>X</mi><mo separator="true">,</mo><mi>Y</mi><mo>)</mo><mo>+</mo><msub><mrow><mi mathvariant="script">L</mi></mrow><mtext><mi mathvariant="normal">G</mi><mi mathvariant="normal">A</mi><mi mathvariant="normal">N</mi></mtext></msub><mo>(</mo><mi>F</mi><mo separator="true">,</mo><msub><mi>D</mi><mi>X</mi></msub><mo separator="true">,</mo><mi>Y</mi><mo separator="true">,</mo><mi>X</mi><mo>)</mo><mo>+</mo><msub><mi>λ</mi><mtext><mi mathvariant="normal">c</mi><mi mathvariant="normal">y</mi><mi mathvariant="normal">c</mi><mi mathvariant="normal">l</mi><mi mathvariant="normal">e</mi></mtext></msub><msub><mrow><mi mathvariant="script">L</mi></mrow><mtext><mi mathvariant="normal">c</mi><mi mathvariant="normal">y</mi><mi mathvariant="normal">c</mi><mi mathvariant="normal">l</mi><mi mathvariant="normal">e</mi></mtext></msub><mo>(</mo><mi>G</mi><mo separator="true">,</mo><mi>F</mi><mo>)</mo></mrow><annotation encoding="application/x-tex">\mathcal{L}_\text{GAN}(G, D_Y, X, Y) + \mathcal{L}_\text{GAN}(F, D_X, Y, X) + \lambda_\text{cycle}\mathcal{L}_\text{cycle}(G, F)
+</annotation></semantics></math></span><span class="katex-html" aria-hidden="true"><span class="strut" style="height:0.75em;"></span><span class="strut bottom" style="height:1.036108em;vertical-align:-0.286108em;"></span><span class="base displaystyle textstyle uncramped"><span class=""><span class="mord displaystyle textstyle uncramped"><span class="mord mathcal">L</span></span><span class="vlist"><span style="top:0.15em;margin-right:0.05em;"><span class="fontsize-ensurer reset-size5 size5"><span style="font-size:0em;">​</span></span><span class="reset-textstyle scriptstyle cramped"><span class="text mord scriptstyle cramped"><span class="mord mathrm">G</span><span class="mord mathrm">A</span><span class="mord mathrm">N</span></span></span></span><span class="baseline-fix"><span class="fontsize-ensurer reset-size5 size5"><span style="font-size:0em;">​</span></span>​</span></span></span><span class="mopen">(</span><span class="mord mathit">G</span><span class="mpunct">,</span><span class="mord"><span class="mord mathit" style="margin-right:0.02778em;">D</span><span class="vlist"><span style="top:0.15em;margin-right:0.05em;margin-left:-0.02778em;"><span class="fontsize-ensurer reset-size5 size5"><span style="font-size:0em;">​</span></span><span class="reset-textstyle scriptstyle cramped"><span class="mord mathit" style="margin-right:0.22222em;">Y</span></span></span><span class="baseline-fix"><span class="fontsize-ensurer reset-size5 size5"><span style="font-size:0em;">​</span></span>​</span></span></span><span class="mpunct">,</span><span class="mord mathit" style="margin-right:0.07847em;">X</span><span class="mpunct">,</span><span class="mord mathit" style="margin-right:0.22222em;">Y</span><span class="mclose">)</span><span class="mbin">+</span><span class=""><span class="mord displaystyle textstyle uncramped"><span class="mord mathcal">L</span></span><span class="vlist"><span style="top:0.15em;margin-right:0.05em;"><span class="fontsize-ensurer reset-size5 size5"><span style="font-size:0em;">​</span></span><span class="reset-textstyle scriptstyle cramped"><span class="text mord scriptstyle cramped"><span class="mord mathrm">G</span><span class="mord mathrm">A</span><span class="mord mathrm">N</span></span></span></span><span class="baseline-fix"><span class="fontsize-ensurer reset-size5 size5"><span style="font-size:0em;">​</span></span>​</span></span></span><span class="mopen">(</span><span class="mord mathit" style="margin-right:0.13889em;">F</span><span class="mpunct">,</span><span class="mord"><span class="mord mathit" style="margin-right:0.02778em;">D</span><span class="vlist"><span style="top:0.15em;margin-right:0.05em;margin-left:-0.02778em;"><span class="fontsize-ensurer reset-size5 size5"><span style="font-size:0em;">​</span></span><span class="reset-textstyle scriptstyle cramped"><span class="mord mathit" style="margin-right:0.07847em;">X</span></span></span><span class="baseline-fix"><span class="fontsize-ensurer reset-size5 size5"><span style="font-size:0em;">​</span></span>​</span></span></span><span class="mpunct">,</span><span class="mord mathit" style="margin-right:0.22222em;">Y</span><span class="mpunct">,</span><span class="mord mathit" style="margin-right:0.07847em;">X</span><span class="mclose">)</span><span class="mbin">+</span><span class="mord"><span class="mord mathit">λ</span><span class="vlist"><span style="top:0.15em;margin-right:0.05em;margin-left:0em;"><span class="fontsize-ensurer reset-size5 size5"><span style="font-size:0em;">​</span></span><span class="reset-textstyle scriptstyle cramped"><span class="text mord scriptstyle cramped"><span class="mord mathrm">c</span><span class="mord mathrm" style="margin-right:0.01389em;">y</span><span class="mord mathrm">c</span><span class="mord mathrm">l</span><span class="mord mathrm">e</span></span></span></span><span class="baseline-fix"><span class="fontsize-ensurer reset-size5 size5"><span style="font-size:0em;">​</span></span>​</span></span></span><span class=""><span class="mord displaystyle textstyle uncramped"><span class="mord mathcal">L</span></span><span class="vlist"><span style="top:0.15em;margin-right:0.05em;"><span class="fontsize-ensurer reset-size5 size5"><span style="font-size:0em;">​</span></span><span class="reset-textstyle scriptstyle cramped"><span class="text mord scriptstyle cramped"><span class="mord mathrm">c</span><span class="mord mathrm" style="margin-right:0.01389em;">y</span><span class="mord mathrm">c</span><span class="mord mathrm">l</span><span class="mord mathrm">e</span></span></span></span><span class="baseline-fix"><span class="fontsize-ensurer reset-size5 size5"><span style="font-size:0em;">​</span></span>​</span></span></span><span class="mopen">(</span><span class="mord mathit">G</span><span class="mpunct">,</span><span class="mord mathit" style="margin-right:0.13889em;">F</span><span class="mclose">)</span></span></span></span></span></p>
+<h2>IV. RetinaGAN</h2>
+<div class="figure">
+<img src="assets/fig/retinagan_alg_1.png" style="display: block; width: 100%;"/>
+</div>
+<p>RetinaGAN trains with a frozen object detector, EfficientDet, that provides object consistency loss. Once trained, the RetinaGAN model adapts simulated images for training the task policy model. Similarly to CycleGAN, we use unpaired data without labels. The overall framework is described in Algorithm 1 and illustrated in Fig. 3, and the details are described below.</p>
+<div class="figure">
+<img src="assets/fig/GAN_F3.png" style="margin: 0; width: 100%;"/>
+<figcaption>
+Fig. 3. Diagram of RetinaGAN stages. The simulated image (top left) is transformed by the sim-to-real generator and subsequently by the real-to-sim generator. The perception loss enforces consistency on object detections from each image. The same pipeline occurs for the real image branch at the bottom.
+</figcaption>
+</div>
+<p>From CycleGAN, we have six images: sim, transferred sim, cycled sim, real, transferred real, and cycled real. Because of object invariance with respect to transfer, an oracle domain adapter would produce identical predictions between the former three images, as well as the latter three. To capture this invariance, we run inference using a pre-trained and frozen EfficientDet model on each image; for each of these pairs, we compute a perception consistency loss.</p>
+<h3>A. Perception Consistency Loss</h3>
+<div class="figure">
+<img src="assets/fig/GAN_F2.png" style="margin: 0; width: 100%;"/>
+<figcaption>
+Fig. 4. Diagram of perception consistency loss computation. An EfficientDet object detector predicts boxes and classes. Consistency of predictions between images is captured by losses similar to those in object detection training.
+</figcaption>
+</div>
+<p>The perception consistency loss penalizes the generator for discrepancies in object detections between translations. Given an image <span class="katex"><span class="katex-mathml"><math><semantics><mrow><mi>I</mi></mrow><annotation encoding="application/x-tex">I</annotation></semantics></math></span><span class="katex-html" aria-hidden="true"><span class="strut" style="height:0.68333em;"></span><span class="strut bottom" style="height:0.68333em;vertical-align:0em;"></span><span class="base textstyle uncramped"><span class="mord mathit" style="margin-right:0.07847em;">I</span></span></span></span>, EfficientDet predicts a series of anchor-based bounding box regressions and class logits at several levels in its Feature Pyramid Network <dt-cite key="lin2017feature"></dt-cite>.</p>
+<p>We compute the perception consistency loss (<span class="katex"><span class="katex-mathml"><math><semantics><mrow><msub><mrow><mi mathvariant="script">L</mi></mrow><mtext><mi mathvariant="normal">p</mi><mi mathvariant="normal">r</mi><mi mathvariant="normal">c</mi><mi mathvariant="normal">p</mi></mtext></msub></mrow><annotation encoding="application/x-tex">\mathcal{L}_\text{prcp}</annotation></semantics></math></span><span class="katex-html" aria-hidden="true"><span class="strut" style="height:0.68333em;"></span><span class="strut bottom" style="height:0.969438em;vertical-align:-0.286108em;"></span><span class="base textstyle uncramped"><span class=""><span class="mord textstyle uncramped"><span class="mord mathcal">L</span></span><span class="vlist"><span style="top:0.15em;margin-right:0.05em;"><span class="fontsize-ensurer reset-size5 size5"><span style="font-size:0em;">​</span></span><span class="reset-textstyle scriptstyle cramped"><span class="text mord scriptstyle cramped"><span class="mord mathrm">p</span><span class="mord mathrm">r</span><span class="mord mathrm">c</span><span class="mord mathrm">p</span></span></span></span><span class="baseline-fix"><span class="fontsize-ensurer reset-size5 size5"><span style="font-size:0em;">​</span></span>​</span></span></span></span></span></span>) given a pair of images similarly to the box and class losses in typical RetinaNet/EfficientDet training. However, because the Focal Loss <dt-cite key="retinanet"></dt-cite>, used as the class loss, assumes one-hot vector ground truth labels, we propose a variation called Focal Consistency Loss (FCL) which is compatible with logit/probability labels (explained below in Section IV-B).</p>
+<p>Without loss of generality, consider an image pair to be <span class="katex"><span class="katex-mathml"><math><semantics><mrow><mi>x</mi></mrow><annotation encoding="application/x-tex">x</annotation></semantics></math></span><span class="katex-html" aria-hidden="true"><span class="strut" style="height:0.43056em;"></span><span class="strut bottom" style="height:0.43056em;vertical-align:0em;"></span><span class="base textstyle uncramped"><span class="mord mathit">x</span></span></span></span> and <span class="katex"><span class="katex-mathml"><math><semantics><mrow><mi>G</mi><mo>(</mo><mi>x</mi><mo>)</mo></mrow><annotation encoding="application/x-tex">G(x)</annotation></semantics></math></span><span class="katex-html" aria-hidden="true"><span class="strut" style="height:0.75em;"></span><span class="strut bottom" style="height:1em;vertical-align:-0.25em;"></span><span class="base textstyle uncramped"><span class="mord mathit">G</span><span class="mopen">(</span><span class="mord mathit">x</span><span class="mclose">)</span></span></span></span>. This loss can be computed with a pre-trained EfficientDet network as:</p>
+<p><span class="katex-display"><span class="katex"><span class="katex-mathml"><math><semantics><mrow><msub><mtext><mi mathvariant="normal">b</mi><mi mathvariant="normal">o</mi><mi mathvariant="normal">x</mi></mtext><mrow><mi>x</mi></mrow></msub><mo separator="true">,</mo><msub><mtext><mi mathvariant="normal">c</mi><mi mathvariant="normal">l</mi><mi mathvariant="normal">s</mi></mtext><mrow><mi>x</mi></mrow></msub><mo>=</mo><mtext><mi mathvariant="normal">E</mi><mi mathvariant="normal">f</mi><mi mathvariant="normal">f</mi><mi mathvariant="normal">i</mi><mi mathvariant="normal">c</mi><mi mathvariant="normal">i</mi><mi mathvariant="normal">e</mi><mi mathvariant="normal">n</mi><mi mathvariant="normal">t</mi><mi mathvariant="normal">D</mi><mi mathvariant="normal">e</mi><mi mathvariant="normal">t</mi></mtext><mo>(</mo><mi>x</mi><mo>)</mo></mrow><annotation encoding="application/x-tex">\text{box}_{x}, \text{cls}_{x} = \text{EfficientDet}(x)
+</annotation></semantics></math></span><span class="katex-html" aria-hidden="true"><span class="strut" style="height:0.75em;"></span><span class="strut bottom" style="height:1em;vertical-align:-0.25em;"></span><span class="base displaystyle textstyle uncramped"><span class="mord"><span class="text mord displaystyle textstyle uncramped"><span class="mord mathrm">b</span><span class="mord mathrm">o</span><span class="mord mathrm">x</span></span><span class="vlist"><span style="top:0.15em;margin-right:0.05em;"><span class="fontsize-ensurer reset-size5 size5"><span style="font-size:0em;">​</span></span><span class="reset-textstyle scriptstyle cramped"><span class="mord scriptstyle cramped"><span class="mord mathit">x</span></span></span></span><span class="baseline-fix"><span class="fontsize-ensurer reset-size5 size5"><span style="font-size:0em;">​</span></span>​</span></span></span><span class="mpunct">,</span><span class="mord"><span class="text mord displaystyle textstyle uncramped"><span class="mord mathrm">c</span><span class="mord mathrm">l</span><span class="mord mathrm">s</span></span><span class="vlist"><span style="top:0.15em;margin-right:0.05em;"><span class="fontsize-ensurer reset-size5 size5"><span style="font-size:0em;">​</span></span><span class="reset-textstyle scriptstyle cramped"><span class="mord scriptstyle cramped"><span class="mord mathit">x</span></span></span></span><span class="baseline-fix"><span class="fontsize-ensurer reset-size5 size5"><span style="font-size:0em;">​</span></span>​</span></span></span><span class="mrel">=</span><span class="text mord displaystyle textstyle uncramped"><span class="mord mathrm">E</span><span class="mord mathrm" style="margin-right:0.07778em;">f</span><span class="mord mathrm" style="margin-right:0.07778em;">f</span><span class="mord mathrm">i</span><span class="mord mathrm">c</span><span class="mord mathrm">i</span><span class="mord mathrm">e</span><span class="mord mathrm">n</span><span class="mord mathrm">t</span><span class="mord mathrm">D</span><span class="mord mathrm">e</span><span class="mord mathrm">t</span></span><span class="mopen">(</span><span class="mord mathit">x</span><span class="mclose">)</span></span></span></span></span></p>
+<p><span class="katex-display"><span class="katex"><span class="katex-mathml"><math><semantics><mrow><msub><mtext><mi mathvariant="normal">b</mi><mi mathvariant="normal">o</mi><mi mathvariant="normal">x</mi></mtext><mrow><mi>G</mi><mo>(</mo><mi>x</mi><mo>)</mo></mrow></msub><mo separator="true">,</mo><msub><mtext><mi mathvariant="normal">c</mi><mi mathvariant="normal">l</mi><mi mathvariant="normal">s</mi></mtext><mrow><mi>G</mi><mo>(</mo><mi>x</mi><mo>)</mo></mrow></msub><mo>=</mo><mtext><mi mathvariant="normal">E</mi><mi mathvariant="normal">f</mi><mi mathvariant="normal">f</mi><mi mathvariant="normal">i</mi><mi mathvariant="normal">c</mi><mi mathvariant="normal">i</mi><mi mathvariant="normal">e</mi><mi mathvariant="normal">n</mi><mi mathvariant="normal">t</mi><mi mathvariant="normal">D</mi><mi mathvariant="normal">e</mi><mi mathvariant="normal">t</mi></mtext><mo>(</mo><mi>G</mi><mo>(</mo><mi>x</mi><mo>)</mo><mo>)</mo></mrow><annotation encoding="application/x-tex">\text{box}_{G(x)}, \text{cls}_{G(x)} = \text{EfficientDet}(G(x))
+</annotation></semantics></math></span><span class="katex-html" aria-hidden="true"><span class="strut" style="height:0.75em;"></span><span class="strut bottom" style="height:1.1052em;vertical-align:-0.3551999999999999em;"></span><span class="base displaystyle textstyle uncramped"><span class="mord"><span class="text mord displaystyle textstyle uncramped"><span class="mord mathrm">b</span><span class="mord mathrm">o</span><span class="mord mathrm">x</span></span><span class="vlist"><span style="top:0.18019999999999992em;margin-right:0.05em;"><span class="fontsize-ensurer reset-size5 size5"><span style="font-size:0em;">​</span></span><span class="reset-textstyle scriptstyle cramped"><span class="mord scriptstyle cramped"><span class="mord mathit">G</span><span class="mopen">(</span><span class="mord mathit">x</span><span class="mclose">)</span></span></span></span><span class="baseline-fix"><span class="fontsize-ensurer reset-size5 size5"><span style="font-size:0em;">​</span></span>​</span></span></span><span class="mpunct">,</span><span class="mord"><span class="text mord displaystyle textstyle uncramped"><span class="mord mathrm">c</span><span class="mord mathrm">l</span><span class="mord mathrm">s</span></span><span class="vlist"><span style="top:0.18019999999999992em;margin-right:0.05em;"><span class="fontsize-ensurer reset-size5 size5"><span style="font-size:0em;">​</span></span><span class="reset-textstyle scriptstyle cramped"><span class="mord scriptstyle cramped"><span class="mord mathit">G</span><span class="mopen">(</span><span class="mord mathit">x</span><span class="mclose">)</span></span></span></span><span class="baseline-fix"><span class="fontsize-ensurer reset-size5 size5"><span style="font-size:0em;">​</span></span>​</span></span></span><span class="mrel">=</span><span class="text mord displaystyle textstyle uncramped"><span class="mord mathrm">E</span><span class="mord mathrm" style="margin-right:0.07778em;">f</span><span class="mord mathrm" style="margin-right:0.07778em;">f</span><span class="mord mathrm">i</span><span class="mord mathrm">c</span><span class="mord mathrm">i</span><span class="mord mathrm">e</span><span class="mord mathrm">n</span><span class="mord mathrm">t</span><span class="mord mathrm">D</span><span class="mord mathrm">e</span><span class="mord mathrm">t</span></span><span class="mopen">(</span><span class="mord mathit">G</span><span class="mopen">(</span><span class="mord mathit">x</span><span class="mclose">)</span><span class="mclose">)</span></span></span></span></span></p>
+<p><span class="katex-display"><span class="katex"><span class="katex-mathml"><math><semantics><mrow><msub><mrow><mi mathvariant="script">L</mi></mrow><mtext><mi mathvariant="normal">p</mi><mi mathvariant="normal">r</mi><mi mathvariant="normal">c</mi><mi mathvariant="normal">p</mi></mtext></msub><mo>(</mo><mi>x</mi><mo separator="true">,</mo><mi>G</mi><mo>(</mo><mi>x</mi><mo>)</mo><mo>)</mo><mo>=</mo><msub><mrow><mi mathvariant="script">L</mi></mrow><mtext><mi mathvariant="normal">H</mi><mi mathvariant="normal">u</mi><mi mathvariant="normal">b</mi><mi mathvariant="normal">e</mi><mi mathvariant="normal">r</mi></mtext></msub><mo>(</mo><msub><mtext><mi mathvariant="normal">b</mi><mi mathvariant="normal">o</mi><mi mathvariant="normal">x</mi></mtext><mrow><mi>x</mi></mrow></msub><mo separator="true">,</mo><msub><mtext><mi mathvariant="normal">b</mi><mi mathvariant="normal">o</mi><mi mathvariant="normal">x</mi></mtext><mrow><mi>G</mi><mo>(</mo><mi>x</mi><mo>)</mo></mrow></msub><mo>)</mo><mo>+</mo><mtext><mi mathvariant="normal">F</mi><mi mathvariant="normal">C</mi><mi mathvariant="normal">L</mi></mtext><mo>(</mo><msub><mtext><mi mathvariant="normal">c</mi><mi mathvariant="normal">l</mi><mi mathvariant="normal">s</mi></mtext><mrow><mi>x</mi></mrow></msub><mo separator="true">,</mo><msub><mtext><mi mathvariant="normal">c</mi><mi mathvariant="normal">l</mi><mi mathvariant="normal">s</mi></mtext><mrow><mi>G</mi><mo>(</mo><mi>x</mi><mo>)</mo></mrow></msub><mo>)</mo></mrow><annotation encoding="application/x-tex">\mathcal{L}_\text{prcp}(x, G(x)) = \mathcal{L}_\text{Huber}(\text{box}_{x}, \text{box}_{G(x)}) + \text{FCL}(\text{cls}_{x}, \text{cls}_{G(x)})
+</annotation></semantics></math></span><span class="katex-html" aria-hidden="true"><span class="strut" style="height:0.75em;"></span><span class="strut bottom" style="height:1.1052em;vertical-align:-0.3551999999999999em;"></span><span class="base displaystyle textstyle uncramped"><span class=""><span class="mord displaystyle textstyle uncramped"><span class="mord mathcal">L</span></span><span class="vlist"><span style="top:0.15em;margin-right:0.05em;"><span class="fontsize-ensurer reset-size5 size5"><span style="font-size:0em;">​</span></span><span class="reset-textstyle scriptstyle cramped"><span class="text mord scriptstyle cramped"><span class="mord mathrm">p</span><span class="mord mathrm">r</span><span class="mord mathrm">c</span><span class="mord mathrm">p</span></span></span></span><span class="baseline-fix"><span class="fontsize-ensurer reset-size5 size5"><span style="font-size:0em;">​</span></span>​</span></span></span><span class="mopen">(</span><span class="mord mathit">x</span><span class="mpunct">,</span><span class="mord mathit">G</span><span class="mopen">(</span><span class="mord mathit">x</span><span class="mclose">)</span><span class="mclose">)</span><span class="mrel">=</span><span class=""><span class="mord displaystyle textstyle uncramped"><span class="mord mathcal">L</span></span><span class="vlist"><span style="top:0.15em;margin-right:0.05em;"><span class="fontsize-ensurer reset-size5 size5"><span style="font-size:0em;">​</span></span><span class="reset-textstyle scriptstyle cramped"><span class="text mord scriptstyle cramped"><span class="mord mathrm">H</span><span class="mord mathrm">u</span><span class="mord mathrm">b</span><span class="mord mathrm">e</span><span class="mord mathrm">r</span></span></span></span><span class="baseline-fix"><span class="fontsize-ensurer reset-size5 size5"><span style="font-size:0em;">​</span></span>​</span></span></span><span class="mopen">(</span><span class="mord"><span class="text mord displaystyle textstyle uncramped"><span class="mord mathrm">b</span><span class="mord mathrm">o</span><span class="mord mathrm">x</span></span><span class="vlist"><span style="top:0.15em;margin-right:0.05em;"><span class="fontsize-ensurer reset-size5 size5"><span style="font-size:0em;">​</span></span><span class="reset-textstyle scriptstyle cramped"><span class="mord scriptstyle cramped"><span class="mord mathit">x</span></span></span></span><span class="baseline-fix"><span class="fontsize-ensurer reset-size5 size5"><span style="font-size:0em;">​</span></span>​</span></span></span><span class="mpunct">,</span><span class="mord"><span class="text mord displaystyle textstyle uncramped"><span class="mord mathrm">b</span><span class="mord mathrm">o</span><span class="mord mathrm">x</span></span><span class="vlist"><span style="top:0.18019999999999992em;margin-right:0.05em;"><span class="fontsize-ensurer reset-size5 size5"><span style="font-size:0em;">​</span></span><span class="reset-textstyle scriptstyle cramped"><span class="mord scriptstyle cramped"><span class="mord mathit">G</span><span class="mopen">(</span><span class="mord mathit">x</span><span class="mclose">)</span></span></span></span><span class="baseline-fix"><span class="fontsize-ensurer reset-size5 size5"><span style="font-size:0em;">​</span></span>​</span></span></span><span class="mclose">)</span><span class="mbin">+</span><span class="text mord displaystyle textstyle uncramped"><span class="mord mathrm">F</span><span class="mord mathrm">C</span><span class="mord mathrm">L</span></span><span class="mopen">(</span><span class="mord"><span class="text mord displaystyle textstyle uncramped"><span class="mord mathrm">c</span><span class="mord mathrm">l</span><span class="mord mathrm">s</span></span><span class="vlist"><span style="top:0.15em;margin-right:0.05em;"><span class="fontsize-ensurer reset-size5 size5"><span style="font-size:0em;">​</span></span><span class="reset-textstyle scriptstyle cramped"><span class="mord scriptstyle cramped"><span class="mord mathit">x</span></span></span></span><span class="baseline-fix"><span class="fontsize-ensurer reset-size5 size5"><span style="font-size:0em;">​</span></span>​</span></span></span><span class="mpunct">,</span><span class="mord"><span class="text mord displaystyle textstyle uncramped"><span class="mord mathrm">c</span><span class="mord mathrm">l</span><span class="mord mathrm">s</span></span><span class="vlist"><span style="top:0.18019999999999992em;margin-right:0.05em;"><span class="fontsize-ensurer reset-size5 size5"><span style="font-size:0em;">​</span></span><span class="reset-textstyle scriptstyle cramped"><span class="mord scriptstyle cramped"><span class="mord mathit">G</span><span class="mopen">(</span><span class="mord mathit">x</span><span class="mclose">)</span></span></span></span><span class="baseline-fix"><span class="fontsize-ensurer reset-size5 size5"><span style="font-size:0em;">​</span></span>​</span></span></span><span class="mclose">)</span></span></span></span></span></p>
+<p><span class="katex"><span class="katex-mathml"><math><semantics><mrow><msub><mrow><mi mathvariant="script">L</mi></mrow><mtext><mi mathvariant="normal">H</mi><mi mathvariant="normal">u</mi><mi mathvariant="normal">b</mi><mi mathvariant="normal">e</mi><mi mathvariant="normal">r</mi></mtext></msub></mrow><annotation encoding="application/x-tex">\mathcal{L}_\text{Huber}</annotation></semantics></math></span><span class="katex-html" aria-hidden="true"><span class="strut" style="height:0.68333em;"></span><span class="strut bottom" style="height:0.83333em;vertical-align:-0.15em;"></span><span class="base textstyle uncramped"><span class=""><span class="mord textstyle uncramped"><span class="mord mathcal">L</span></span><span class="vlist"><span style="top:0.15em;margin-right:0.05em;"><span class="fontsize-ensurer reset-size5 size5"><span style="font-size:0em;">​</span></span><span class="reset-textstyle scriptstyle cramped"><span class="text mord scriptstyle cramped"><span class="mord mathrm">H</span><span class="mord mathrm">u</span><span class="mord mathrm">b</span><span class="mord mathrm">e</span><span class="mord mathrm">r</span></span></span></span><span class="baseline-fix"><span class="fontsize-ensurer reset-size5 size5"><span style="font-size:0em;">​</span></span>​</span></span></span></span></span></span> is the Huber Loss <dt-cite key="elsr"></dt-cite> used as the box regression loss. This process is visualized in Fig. 4.</p>
+<p>The Perception Consistency Loss on a batch of simulated images <span class="katex"><span class="katex-mathml"><math><semantics><mrow><mi>x</mi></mrow><annotation encoding="application/x-tex">x</annotation></semantics></math></span><span class="katex-html" aria-hidden="true"><span class="strut" style="height:0.43056em;"></span><span class="strut bottom" style="height:0.43056em;vertical-align:0em;"></span><span class="base textstyle uncramped"><span class="mord mathit">x</span></span></span></span> and real images <span class="katex"><span class="katex-mathml"><math><semantics><mrow><mi>y</mi></mrow><annotation encoding="application/x-tex">y</annotation></semantics></math></span><span class="katex-html" aria-hidden="true"><span class="strut" style="height:0.43056em;"></span><span class="strut bottom" style="height:0.625em;vertical-align:-0.19444em;"></span><span class="base textstyle uncramped"><span class="mord mathit" style="margin-right:0.03588em;">y</span></span></span></span>, using the sim-to-real generator <span class="katex"><span class="katex-mathml"><math><semantics><mrow><mi>G</mi></mrow><annotation encoding="application/x-tex">G</annotation></semantics></math></span><span class="katex-html" aria-hidden="true"><span class="strut" style="height:0.68333em;"></span><span class="strut bottom" style="height:0.68333em;vertical-align:0em;"></span><span class="base textstyle uncramped"><span class="mord mathit">G</span></span></span></span> and the real-to-sim generator <span class="katex"><span class="katex-mathml"><math><semantics><mrow><mi>F</mi></mrow><annotation encoding="application/x-tex">F</annotation></semantics></math></span><span class="katex-html" aria-hidden="true"><span class="strut" style="height:0.68333em;"></span><span class="strut bottom" style="height:0.68333em;vertical-align:0em;"></span><span class="base textstyle uncramped"><span class="mord mathit" style="margin-right:0.13889em;">F</span></span></span></span>, is:</p>
+<p><span class="katex-display"><span class="katex"><span class="katex-mathml"><math><semantics><mrow><msub><mrow><mi mathvariant="script">L</mi></mrow><mtext><mi mathvariant="normal">p</mi><mi mathvariant="normal">r</mi><mi mathvariant="normal">c</mi><mi mathvariant="normal">p</mi></mtext></msub><mo>(</mo><mi>x</mi><mo separator="true">,</mo><mi>y</mi><mo separator="true">,</mo><mi>F</mi><mo separator="true">,</mo><mi>G</mi><mo>)</mo><mo>=</mo><msub><mrow><mi mathvariant="script">L</mi></mrow><mtext><mi mathvariant="normal">p</mi><mi mathvariant="normal">r</mi><mi mathvariant="normal">c</mi><mi mathvariant="normal">p</mi></mtext></msub><mo>(</mo><mi>x</mi><mo separator="true">,</mo><mi>G</mi><mo>(</mo><mi>x</mi><mo>)</mo><mo>)</mo><mo>+</mo><mfrac><mrow><mn>1</mn></mrow><mrow><mn>2</mn></mrow></mfrac><msub><mrow><mi mathvariant="script">L</mi></mrow><mtext><mi mathvariant="normal">p</mi><mi mathvariant="normal">r</mi><mi mathvariant="normal">c</mi><mi mathvariant="normal">p</mi></mtext></msub><mo>(</mo><mi>x</mi><mo separator="true">,</mo><mi>F</mi><mo>(</mo><mi>G</mi><mo>(</mo><mi>x</mi><mo>)</mo><mo>)</mo><mo>)</mo></mrow><annotation encoding="application/x-tex">\mathcal{L}_\text{prcp}(x,y,F,G) = \mathcal{L}_\text{prcp}(x, G(x)) + \frac{1}{2} \mathcal{L}_\text{prcp}(x, F(G(x))) 
+</annotation></semantics></math></span><span class="katex-html" aria-hidden="true"><span class="strut" style="height:1.32144em;"></span><span class="strut bottom" style="height:2.00744em;vertical-align:-0.686em;"></span><span class="base displaystyle textstyle uncramped"><span class=""><span class="mord displaystyle textstyle uncramped"><span class="mord mathcal">L</span></span><span class="vlist"><span style="top:0.15em;margin-right:0.05em;"><span class="fontsize-ensurer reset-size5 size5"><span style="font-size:0em;">​</span></span><span class="reset-textstyle scriptstyle cramped"><span class="text mord scriptstyle cramped"><span class="mord mathrm">p</span><span class="mord mathrm">r</span><span class="mord mathrm">c</span><span class="mord mathrm">p</span></span></span></span><span class="baseline-fix"><span class="fontsize-ensurer reset-size5 size5"><span style="font-size:0em;">​</span></span>​</span></span></span><span class="mopen">(</span><span class="mord mathit">x</span><span class="mpunct">,</span><span class="mord mathit" style="margin-right:0.03588em;">y</span><span class="mpunct">,</span><span class="mord mathit" style="margin-right:0.13889em;">F</span><span class="mpunct">,</span><span class="mord mathit">G</span><span class="mclose">)</span><span class="mrel">=</span><span class=""><span class="mord displaystyle textstyle uncramped"><span class="mord mathcal">L</span></span><span class="vlist"><span style="top:0.15em;margin-right:0.05em;"><span class="fontsize-ensurer reset-size5 size5"><span style="font-size:0em;">​</span></span><span class="reset-textstyle scriptstyle cramped"><span class="text mord scriptstyle cramped"><span class="mord mathrm">p</span><span class="mord mathrm">r</span><span class="mord mathrm">c</span><span class="mord mathrm">p</span></span></span></span><span class="baseline-fix"><span class="fontsize-ensurer reset-size5 size5"><span style="font-size:0em;">​</span></span>​</span></span></span><span class="mopen">(</span><span class="mord mathit">x</span><span class="mpunct">,</span><span class="mord mathit">G</span><span class="mopen">(</span><span class="mord mathit">x</span><span class="mclose">)</span><span class="mclose">)</span><span class="mbin">+</span><span class="mord reset-textstyle displaystyle textstyle uncramped"><span class="sizing reset-size5 size5 reset-textstyle textstyle uncramped nulldelimiter"></span><span class="mfrac"><span class="vlist"><span style="top:0.686em;"><span class="fontsize-ensurer reset-size5 size5"><span style="font-size:0em;">​</span></span><span class="reset-textstyle textstyle cramped"><span class="mord textstyle cramped"><span class="mord mathrm">2</span></span></span></span><span style="top:-0.22999999999999998em;"><span class="fontsize-ensurer reset-size5 size5"><span style="font-size:0em;">​</span></span><span class="reset-textstyle textstyle uncramped frac-line"></span></span><span style="top:-0.677em;"><span class="fontsize-ensurer reset-size5 size5"><span style="font-size:0em;">​</span></span><span class="reset-textstyle textstyle uncramped"><span class="mord textstyle uncramped"><span class="mord mathrm">1</span></span></span></span><span class="baseline-fix"><span class="fontsize-ensurer reset-size5 size5"><span style="font-size:0em;">​</span></span>​</span></span></span><span class="sizing reset-size5 size5 reset-textstyle textstyle uncramped nulldelimiter"></span></span><span class=""><span class="mord displaystyle textstyle uncramped"><span class="mord mathcal">L</span></span><span class="vlist"><span style="top:0.15em;margin-right:0.05em;"><span class="fontsize-ensurer reset-size5 size5"><span style="font-size:0em;">​</span></span><span class="reset-textstyle scriptstyle cramped"><span class="text mord scriptstyle cramped"><span class="mord mathrm">p</span><span class="mord mathrm">r</span><span class="mord mathrm">c</span><span class="mord mathrm">p</span></span></span></span><span class="baseline-fix"><span class="fontsize-ensurer reset-size5 size5"><span style="font-size:0em;">​</span></span>​</span></span></span><span class="mopen">(</span><span class="mord mathit">x</span><span class="mpunct">,</span><span class="mord mathit" style="margin-right:0.13889em;">F</span><span class="mopen">(</span><span class="mord mathit">G</span><span class="mopen">(</span><span class="mord mathit">x</span><span class="mclose">)</span><span class="mclose">)</span><span class="mclose">)</span></span></span></span></span></p>
+<p><span class="katex-display"><span class="katex"><span class="katex-mathml"><math><semantics><mrow><mo>+</mo><mfrac><mrow><mn>1</mn></mrow><mrow><mn>2</mn></mrow></mfrac><msub><mrow><mi mathvariant="script">L</mi></mrow><mtext><mi mathvariant="normal">p</mi><mi mathvariant="normal">r</mi><mi mathvariant="normal">c</mi><mi mathvariant="normal">p</mi></mtext></msub><mo>(</mo><mi>G</mi><mo>(</mo><mi>x</mi><mo>)</mo><mo separator="true">,</mo><mi>F</mi><mo>(</mo><mi>G</mi><mo>(</mo><mi>x</mi><mo>)</mo><mo>)</mo></mrow><annotation encoding="application/x-tex">+ \frac{1}{2} \mathcal{L}_\text{prcp}(G(x), F(G(x)) 
+</annotation></semantics></math></span><span class="katex-html" aria-hidden="true"><span class="strut" style="height:1.32144em;"></span><span class="strut bottom" style="height:2.00744em;vertical-align:-0.686em;"></span><span class="base displaystyle textstyle uncramped"><span class="mord">+</span><span class="mord reset-textstyle displaystyle textstyle uncramped"><span class="sizing reset-size5 size5 reset-textstyle textstyle uncramped nulldelimiter"></span><span class="mfrac"><span class="vlist"><span style="top:0.686em;"><span class="fontsize-ensurer reset-size5 size5"><span style="font-size:0em;">​</span></span><span class="reset-textstyle textstyle cramped"><span class="mord textstyle cramped"><span class="mord mathrm">2</span></span></span></span><span style="top:-0.22999999999999998em;"><span class="fontsize-ensurer reset-size5 size5"><span style="font-size:0em;">​</span></span><span class="reset-textstyle textstyle uncramped frac-line"></span></span><span style="top:-0.677em;"><span class="fontsize-ensurer reset-size5 size5"><span style="font-size:0em;">​</span></span><span class="reset-textstyle textstyle uncramped"><span class="mord textstyle uncramped"><span class="mord mathrm">1</span></span></span></span><span class="baseline-fix"><span class="fontsize-ensurer reset-size5 size5"><span style="font-size:0em;">​</span></span>​</span></span></span><span class="sizing reset-size5 size5 reset-textstyle textstyle uncramped nulldelimiter"></span></span><span class=""><span class="mord displaystyle textstyle uncramped"><span class="mord mathcal">L</span></span><span class="vlist"><span style="top:0.15em;margin-right:0.05em;"><span class="fontsize-ensurer reset-size5 size5"><span style="font-size:0em;">​</span></span><span class="reset-textstyle scriptstyle cramped"><span class="text mord scriptstyle cramped"><span class="mord mathrm">p</span><span class="mord mathrm">r</span><span class="mord mathrm">c</span><span class="mord mathrm">p</span></span></span></span><span class="baseline-fix"><span class="fontsize-ensurer reset-size5 size5"><span style="font-size:0em;">​</span></span>​</span></span></span><span class="mopen">(</span><span class="mord mathit">G</span><span class="mopen">(</span><span class="mord mathit">x</span><span class="mclose">)</span><span class="mpunct">,</span><span class="mord mathit" style="margin-right:0.13889em;">F</span><span class="mopen">(</span><span class="mord mathit">G</span><span class="mopen">(</span><span class="mord mathit">x</span><span class="mclose">)</span><span class="mclose">)</span></span></span></span></span></p>
+<p><span class="katex-display"><span class="katex"><span class="katex-mathml"><math><semantics><mrow><mo>+</mo><msub><mrow><mi mathvariant="script">L</mi></mrow><mtext><mi mathvariant="normal">p</mi><mi mathvariant="normal">r</mi><mi mathvariant="normal">c</mi><mi mathvariant="normal">p</mi></mtext></msub><mo>(</mo><mi>y</mi><mo separator="true">,</mo><mi>F</mi><mo>(</mo><mi>y</mi><mo>)</mo><mo>)</mo><mo>+</mo><mfrac><mrow><mn>1</mn></mrow><mrow><mn>2</mn></mrow></mfrac><msub><mrow><mi mathvariant="script">L</mi></mrow><mtext><mi mathvariant="normal">p</mi><mi mathvariant="normal">r</mi><mi mathvariant="normal">c</mi><mi mathvariant="normal">p</mi></mtext></msub><mo>(</mo><mi>y</mi><mo separator="true">,</mo><mi>G</mi><mo>(</mo><mi>F</mi><mo>(</mo><mi>y</mi><mo>)</mo><mo>)</mo><mo>)</mo></mrow><annotation encoding="application/x-tex">+ \mathcal{L}_\text{prcp}(y, F(y)) + \frac{1}{2} \mathcal{L}_\text{prcp}(y, G(F(y))) 
+</annotation></semantics></math></span><span class="katex-html" aria-hidden="true"><span class="strut" style="height:1.32144em;"></span><span class="strut bottom" style="height:2.00744em;vertical-align:-0.686em;"></span><span class="base displaystyle textstyle uncramped"><span class="mord">+</span><span class=""><span class="mord displaystyle textstyle uncramped"><span class="mord mathcal">L</span></span><span class="vlist"><span style="top:0.15em;margin-right:0.05em;"><span class="fontsize-ensurer reset-size5 size5"><span style="font-size:0em;">​</span></span><span class="reset-textstyle scriptstyle cramped"><span class="text mord scriptstyle cramped"><span class="mord mathrm">p</span><span class="mord mathrm">r</span><span class="mord mathrm">c</span><span class="mord mathrm">p</span></span></span></span><span class="baseline-fix"><span class="fontsize-ensurer reset-size5 size5"><span style="font-size:0em;">​</span></span>​</span></span></span><span class="mopen">(</span><span class="mord mathit" style="margin-right:0.03588em;">y</span><span class="mpunct">,</span><span class="mord mathit" style="margin-right:0.13889em;">F</span><span class="mopen">(</span><span class="mord mathit" style="margin-right:0.03588em;">y</span><span class="mclose">)</span><span class="mclose">)</span><span class="mbin">+</span><span class="mord reset-textstyle displaystyle textstyle uncramped"><span class="sizing reset-size5 size5 reset-textstyle textstyle uncramped nulldelimiter"></span><span class="mfrac"><span class="vlist"><span style="top:0.686em;"><span class="fontsize-ensurer reset-size5 size5"><span style="font-size:0em;">​</span></span><span class="reset-textstyle textstyle cramped"><span class="mord textstyle cramped"><span class="mord mathrm">2</span></span></span></span><span style="top:-0.22999999999999998em;"><span class="fontsize-ensurer reset-size5 size5"><span style="font-size:0em;">​</span></span><span class="reset-textstyle textstyle uncramped frac-line"></span></span><span style="top:-0.677em;"><span class="fontsize-ensurer reset-size5 size5"><span style="font-size:0em;">​</span></span><span class="reset-textstyle textstyle uncramped"><span class="mord textstyle uncramped"><span class="mord mathrm">1</span></span></span></span><span class="baseline-fix"><span class="fontsize-ensurer reset-size5 size5"><span style="font-size:0em;">​</span></span>​</span></span></span><span class="sizing reset-size5 size5 reset-textstyle textstyle uncramped nulldelimiter"></span></span><span class=""><span class="mord displaystyle textstyle uncramped"><span class="mord mathcal">L</span></span><span class="vlist"><span style="top:0.15em;margin-right:0.05em;"><span class="fontsize-ensurer reset-size5 size5"><span style="font-size:0em;">​</span></span><span class="reset-textstyle scriptstyle cramped"><span class="text mord scriptstyle cramped"><span class="mord mathrm">p</span><span class="mord mathrm">r</span><span class="mord mathrm">c</span><span class="mord mathrm">p</span></span></span></span><span class="baseline-fix"><span class="fontsize-ensurer reset-size5 size5"><span style="font-size:0em;">​</span></span>​</span></span></span><span class="mopen">(</span><span class="mord mathit" style="margin-right:0.03588em;">y</span><span class="mpunct">,</span><span class="mord mathit">G</span><span class="mopen">(</span><span class="mord mathit" style="margin-right:0.13889em;">F</span><span class="mopen">(</span><span class="mord mathit" style="margin-right:0.03588em;">y</span><span class="mclose">)</span><span class="mclose">)</span><span class="mclose">)</span></span></span></span></span></p>
+<p><span class="katex-display"><span class="katex"><span class="katex-mathml"><math><semantics><mrow><mo>+</mo><mfrac><mrow><mn>1</mn></mrow><mrow><mn>2</mn></mrow></mfrac><msub><mrow><mi mathvariant="script">L</mi></mrow><mtext><mi mathvariant="normal">p</mi><mi mathvariant="normal">r</mi><mi mathvariant="normal">c</mi><mi mathvariant="normal">p</mi></mtext></msub><mo>(</mo><mi>F</mi><mo>(</mo><mi>y</mi><mo>)</mo><mo separator="true">,</mo><mi>G</mi><mo>(</mo><mi>F</mi><mo>(</mo><mi>y</mi><mo>)</mo><mo>)</mo></mrow><annotation encoding="application/x-tex">+ \frac{1}{2} \mathcal{L}_\text{prcp}(F(y), G(F(y)) 
+</annotation></semantics></math></span><span class="katex-html" aria-hidden="true"><span class="strut" style="height:1.32144em;"></span><span class="strut bottom" style="height:2.00744em;vertical-align:-0.686em;"></span><span class="base displaystyle textstyle uncramped"><span class="mord">+</span><span class="mord reset-textstyle displaystyle textstyle uncramped"><span class="sizing reset-size5 size5 reset-textstyle textstyle uncramped nulldelimiter"></span><span class="mfrac"><span class="vlist"><span style="top:0.686em;"><span class="fontsize-ensurer reset-size5 size5"><span style="font-size:0em;">​</span></span><span class="reset-textstyle textstyle cramped"><span class="mord textstyle cramped"><span class="mord mathrm">2</span></span></span></span><span style="top:-0.22999999999999998em;"><span class="fontsize-ensurer reset-size5 size5"><span style="font-size:0em;">​</span></span><span class="reset-textstyle textstyle uncramped frac-line"></span></span><span style="top:-0.677em;"><span class="fontsize-ensurer reset-size5 size5"><span style="font-size:0em;">​</span></span><span class="reset-textstyle textstyle uncramped"><span class="mord textstyle uncramped"><span class="mord mathrm">1</span></span></span></span><span class="baseline-fix"><span class="fontsize-ensurer reset-size5 size5"><span style="font-size:0em;">​</span></span>​</span></span></span><span class="sizing reset-size5 size5 reset-textstyle textstyle uncramped nulldelimiter"></span></span><span class=""><span class="mord displaystyle textstyle uncramped"><span class="mord mathcal">L</span></span><span class="vlist"><span style="top:0.15em;margin-right:0.05em;"><span class="fontsize-ensurer reset-size5 size5"><span style="font-size:0em;">​</span></span><span class="reset-textstyle scriptstyle cramped"><span class="text mord scriptstyle cramped"><span class="mord mathrm">p</span><span class="mord mathrm">r</span><span class="mord mathrm">c</span><span class="mord mathrm">p</span></span></span></span><span class="baseline-fix"><span class="fontsize-ensurer reset-size5 size5"><span style="font-size:0em;">​</span></span>​</span></span></span><span class="mopen">(</span><span class="mord mathit" style="margin-right:0.13889em;">F</span><span class="mopen">(</span><span class="mord mathit" style="margin-right:0.03588em;">y</span><span class="mclose">)</span><span class="mpunct">,</span><span class="mord mathit">G</span><span class="mopen">(</span><span class="mord mathit" style="margin-right:0.13889em;">F</span><span class="mopen">(</span><span class="mord mathit" style="margin-right:0.03588em;">y</span><span class="mclose">)</span><span class="mclose">)</span></span></span></span></span></p>
+<p>We halve the losses involving the cycled <span class="katex"><span class="katex-mathml"><math><semantics><mrow><mi>F</mi><mo>(</mo><mi>G</mi><mo>(</mo><mi>x</mi><mo>)</mo><mo>)</mo></mrow><annotation encoding="application/x-tex">F(G(x))</annotation></semantics></math></span><span class="katex-html" aria-hidden="true"><span class="strut" style="height:0.75em;"></span><span class="strut bottom" style="height:1em;vertical-align:-0.25em;"></span><span class="base textstyle uncramped"><span class="mord mathit" style="margin-right:0.13889em;">F</span><span class="mopen">(</span><span class="mord mathit">G</span><span class="mopen">(</span><span class="mord mathit">x</span><span class="mclose">)</span><span class="mclose">)</span></span></span></span> and <span class="katex"><span class="katex-mathml"><math><semantics><mrow><mi>G</mi><mo>(</mo><mi>F</mi><mo>(</mo><mi>x</mi><mo>)</mo><mo>)</mo></mrow><annotation encoding="application/x-tex">G(F(x))</annotation></semantics></math></span><span class="katex-html" aria-hidden="true"><span class="strut" style="height:0.75em;"></span><span class="strut bottom" style="height:1em;vertical-align:-0.25em;"></span><span class="base textstyle uncramped"><span class="mord mathit">G</span><span class="mopen">(</span><span class="mord mathit" style="margin-right:0.13889em;">F</span><span class="mopen">(</span><span class="mord mathit">x</span><span class="mclose">)</span><span class="mclose">)</span></span></span></span> images because they are compared twice (against the orginal and transferred images), but find that this weight has little effect in practice.</p>
+<p>We arrive at the overall RetinaGAN loss:</p>
+<p><span class="katex-display"><span class="katex"><span class="katex-mathml"><math><semantics><mrow><msub><mrow><mi mathvariant="script">L</mi></mrow><mtext><mi mathvariant="normal">R</mi><mi mathvariant="normal">e</mi><mi mathvariant="normal">t</mi><mi mathvariant="normal">i</mi><mi mathvariant="normal">n</mi><mi mathvariant="normal">a</mi><mi mathvariant="normal">G</mi><mi mathvariant="normal">A</mi><mi mathvariant="normal">N</mi></mtext></msub><mo>(</mo><mi>G</mi><mo separator="true">,</mo><mi>F</mi><mo separator="true">,</mo><msub><mi>D</mi><mi>x</mi></msub><mo separator="true">,</mo><msub><mi>D</mi><mi>y</mi></msub><mo>)</mo><mo>=</mo><msub><mrow><mi mathvariant="script">L</mi></mrow><mtext><mi mathvariant="normal">C</mi><mi mathvariant="normal">y</mi><mi mathvariant="normal">c</mi><mi mathvariant="normal">l</mi><mi mathvariant="normal">e</mi><mi mathvariant="normal">G</mi><mi mathvariant="normal">A</mi><mi mathvariant="normal">N</mi></mtext></msub><mo>(</mo><mi>G</mi><mo separator="true">,</mo><mi>F</mi><mo separator="true">,</mo><msub><mi>D</mi><mi>x</mi></msub><mo separator="true">,</mo><msub><mi>D</mi><mi>y</mi></msub><mo>)</mo></mrow><annotation encoding="application/x-tex">\mathcal{L}_\text{RetinaGAN}(G, F, D_x, D_y) = \mathcal{L}_\text{CycleGAN}(G, F, D_x, D_y)
+</annotation></semantics></math></span><span class="katex-html" aria-hidden="true"><span class="strut" style="height:0.75em;"></span><span class="strut bottom" style="height:1.036108em;vertical-align:-0.286108em;"></span><span class="base displaystyle textstyle uncramped"><span class=""><span class="mord displaystyle textstyle uncramped"><span class="mord mathcal">L</span></span><span class="vlist"><span style="top:0.15em;margin-right:0.05em;"><span class="fontsize-ensurer reset-size5 size5"><span style="font-size:0em;">​</span></span><span class="reset-textstyle scriptstyle cramped"><span class="text mord scriptstyle cramped"><span class="mord mathrm">R</span><span class="mord mathrm">e</span><span class="mord mathrm">t</span><span class="mord mathrm">i</span><span class="mord mathrm">n</span><span class="mord mathrm">a</span><span class="mord mathrm">G</span><span class="mord mathrm">A</span><span class="mord mathrm">N</span></span></span></span><span class="baseline-fix"><span class="fontsize-ensurer reset-size5 size5"><span style="font-size:0em;">​</span></span>​</span></span></span><span class="mopen">(</span><span class="mord mathit">G</span><span class="mpunct">,</span><span class="mord mathit" style="margin-right:0.13889em;">F</span><span class="mpunct">,</span><span class="mord"><span class="mord mathit" style="margin-right:0.02778em;">D</span><span class="vlist"><span style="top:0.15em;margin-right:0.05em;margin-left:-0.02778em;"><span class="fontsize-ensurer reset-size5 size5"><span style="font-size:0em;">​</span></span><span class="reset-textstyle scriptstyle cramped"><span class="mord mathit">x</span></span></span><span class="baseline-fix"><span class="fontsize-ensurer reset-size5 size5"><span style="font-size:0em;">​</span></span>​</span></span></span><span class="mpunct">,</span><span class="mord"><span class="mord mathit" style="margin-right:0.02778em;">D</span><span class="vlist"><span style="top:0.15em;margin-right:0.05em;margin-left:-0.02778em;"><span class="fontsize-ensurer reset-size5 size5"><span style="font-size:0em;">​</span></span><span class="reset-textstyle scriptstyle cramped"><span class="mord mathit" style="margin-right:0.03588em;">y</span></span></span><span class="baseline-fix"><span class="fontsize-ensurer reset-size5 size5"><span style="font-size:0em;">​</span></span>​</span></span></span><span class="mclose">)</span><span class="mrel">=</span><span class=""><span class="mord displaystyle textstyle uncramped"><span class="mord mathcal">L</span></span><span class="vlist"><span style="top:0.15em;margin-right:0.05em;"><span class="fontsize-ensurer reset-size5 size5"><span style="font-size:0em;">​</span></span><span class="reset-textstyle scriptstyle cramped"><span class="text mord scriptstyle cramped"><span class="mord mathrm">C</span><span class="mord mathrm" style="margin-right:0.01389em;">y</span><span class="mord mathrm">c</span><span class="mord mathrm">l</span><span class="mord mathrm">e</span><span class="mord mathrm">G</span><span class="mord mathrm">A</span><span class="mord mathrm">N</span></span></span></span><span class="baseline-fix"><span class="fontsize-ensurer reset-size5 size5"><span style="font-size:0em;">​</span></span>​</span></span></span><span class="mopen">(</span><span class="mord mathit">G</span><span class="mpunct">,</span><span class="mord mathit" style="margin-right:0.13889em;">F</span><span class="mpunct">,</span><span class="mord"><span class="mord mathit" style="margin-right:0.02778em;">D</span><span class="vlist"><span style="top:0.15em;margin-right:0.05em;margin-left:-0.02778em;"><span class="fontsize-ensurer reset-size5 size5"><span style="font-size:0em;">​</span></span><span class="reset-textstyle scriptstyle cramped"><span class="mord mathit">x</span></span></span><span class="baseline-fix"><span class="fontsize-ensurer reset-size5 size5"><span style="font-size:0em;">​</span></span>​</span></span></span><span class="mpunct">,</span><span class="mord"><span class="mord mathit" style="margin-right:0.02778em;">D</span><span class="vlist"><span style="top:0.15em;margin-right:0.05em;margin-left:-0.02778em;"><span class="fontsize-ensurer reset-size5 size5"><span style="font-size:0em;">​</span></span><span class="reset-textstyle scriptstyle cramped"><span class="mord mathit" style="margin-right:0.03588em;">y</span></span></span><span class="baseline-fix"><span class="fontsize-ensurer reset-size5 size5"><span style="font-size:0em;">​</span></span>​</span></span></span><span class="mclose">)</span></span></span></span></span></p>
+<p><span class="katex-display"><span class="katex"><span class="katex-mathml"><math><semantics><mrow><mo>+</mo><msub><mi>λ</mi><mtext><mi mathvariant="normal">p</mi><mi mathvariant="normal">r</mi><mi mathvariant="normal">c</mi><mi mathvariant="normal">p</mi></mtext></msub><msub><mrow><mi mathvariant="script">L</mi></mrow><mtext><mi mathvariant="normal">p</mi><mi mathvariant="normal">r</mi><mi mathvariant="normal">c</mi><mi mathvariant="normal">p</mi></mtext></msub><mo>(</mo><mi>x</mi><mo separator="true">,</mo><mi>y</mi><mo separator="true">,</mo><mi>F</mi><mo separator="true">,</mo><mi>G</mi><mo>)</mo></mrow><annotation encoding="application/x-tex">+ \lambda_\text{prcp}\mathcal{L}_\text{prcp}(x,y,F,G)
+</annotation></semantics></math></span><span class="katex-html" aria-hidden="true"><span class="strut" style="height:0.75em;"></span><span class="strut bottom" style="height:1.036108em;vertical-align:-0.286108em;"></span><span class="base displaystyle textstyle uncramped"><span class="mord">+</span><span class="mord"><span class="mord mathit">λ</span><span class="vlist"><span style="top:0.15em;margin-right:0.05em;margin-left:0em;"><span class="fontsize-ensurer reset-size5 size5"><span style="font-size:0em;">​</span></span><span class="reset-textstyle scriptstyle cramped"><span class="text mord scriptstyle cramped"><span class="mord mathrm">p</span><span class="mord mathrm">r</span><span class="mord mathrm">c</span><span class="mord mathrm">p</span></span></span></span><span class="baseline-fix"><span class="fontsize-ensurer reset-size5 size5"><span style="font-size:0em;">​</span></span>​</span></span></span><span class=""><span class="mord displaystyle textstyle uncramped"><span class="mord mathcal">L</span></span><span class="vlist"><span style="top:0.15em;margin-right:0.05em;"><span class="fontsize-ensurer reset-size5 size5"><span style="font-size:0em;">​</span></span><span class="reset-textstyle scriptstyle cramped"><span class="text mord scriptstyle cramped"><span class="mord mathrm">p</span><span class="mord mathrm">r</span><span class="mord mathrm">c</span><span class="mord mathrm">p</span></span></span></span><span class="baseline-fix"><span class="fontsize-ensurer reset-size5 size5"><span style="font-size:0em;">​</span></span>​</span></span></span><span class="mopen">(</span><span class="mord mathit">x</span><span class="mpunct">,</span><span class="mord mathit" style="margin-right:0.03588em;">y</span><span class="mpunct">,</span><span class="mord mathit" style="margin-right:0.13889em;">F</span><span class="mpunct">,</span><span class="mord mathit">G</span><span class="mclose">)</span></span></span></span></span></p>
+<h3>B. Focal Consistency Loss (FCL)</h3>
+<p>We introduce and derive a novel, interpolated version of the Focal Loss (FL) called Focal Consistency Loss (FCL), which extends support to a ground truth confidence probability <span class="katex"><span class="katex-mathml"><math><semantics><mrow><mi>y</mi><mo>∈</mo><mo>[</mo><mn>0</mn><mo separator="true">,</mo><mn>1</mn><mo>]</mo></mrow><annotation encoding="application/x-tex">y \in [0,1]</annotation></semantics></math></span><span class="katex-html" aria-hidden="true"><span class="strut" style="height:0.75em;"></span><span class="strut bottom" style="height:1em;vertical-align:-0.25em;"></span><span class="base textstyle uncramped"><span class="mord mathit" style="margin-right:0.03588em;">y</span><span class="mrel">∈</span><span class="mopen">[</span><span class="mord mathrm">0</span><span class="mpunct">,</span><span class="mord mathrm">1</span><span class="mclose">]</span></span></span></span> from a binary <span class="katex"><span class="katex-mathml"><math><semantics><mrow><mi>y</mi><mo>∈</mo><mo>{</mo><mn>0</mn><mo separator="true">,</mo><mn>1</mn><mo>}</mo></mrow><annotation encoding="application/x-tex">y \in \{0, 1\}</annotation></semantics></math></span><span class="katex-html" aria-hidden="true"><span class="strut" style="height:0.75em;"></span><span class="strut bottom" style="height:1em;vertical-align:-0.25em;"></span><span class="base textstyle uncramped"><span class="mord mathit" style="margin-right:0.03588em;">y</span><span class="mrel">∈</span><span class="mopen">{</span><span class="mord mathrm">0</span><span class="mpunct">,</span><span class="mord mathrm">1</span><span class="mclose">}</span></span></span></span>. Focal losses handle class imbalances in one-stage object detectors, improving upon Cross Entropy (CE) and Balanced Cross Entropy (BCE) losses (Section 3, <dt-cite key="retinanet"></dt-cite>).</p>
+<p>We begin from CE loss, which can be defined as:</p>
+<p><span class="katex-display"><span class="katex"><span class="katex-mathml"><math><semantics><mrow><mtext><mi mathvariant="normal">C</mi><mi mathvariant="normal">E</mi></mtext><mo>(</mo><mi>y</mi><mo separator="true">,</mo><mi>p</mi><mo>)</mo><mo>=</mo><mi>y</mi><mi>log</mi><mi>p</mi><mo>−</mo><mo>(</mo><mn>1</mn><mo>−</mo><mi>y</mi><mo>)</mo><mi>log</mi><mo>(</mo><mn>1</mn><mo>−</mo><mi>p</mi><mo>)</mo></mrow><annotation encoding="application/x-tex">\text{CE}(y,p) = y \log p - (1-y)\log(1-p)
+</annotation></semantics></math></span><span class="katex-html" aria-hidden="true"><span class="strut" style="height:0.75em;"></span><span class="strut bottom" style="height:1em;vertical-align:-0.25em;"></span><span class="base displaystyle textstyle uncramped"><span class="text mord displaystyle textstyle uncramped"><span class="mord mathrm">C</span><span class="mord mathrm">E</span></span><span class="mopen">(</span><span class="mord mathit" style="margin-right:0.03588em;">y</span><span class="mpunct">,</span><span class="mord mathit">p</span><span class="mclose">)</span><span class="mrel">=</span><span class="mord mathit" style="margin-right:0.03588em;">y</span><span class="mop">lo<span style="margin-right:0.01389em;">g</span></span><span class="mord mathit">p</span><span class="mbin">−</span><span class="mopen">(</span><span class="mord mathrm">1</span><span class="mbin">−</span><span class="mord mathit" style="margin-right:0.03588em;">y</span><span class="mclose">)</span><span class="mop">lo<span style="margin-right:0.01389em;">g</span></span><span class="mopen">(</span><span class="mord mathrm">1</span><span class="mbin">−</span><span class="mord mathit">p</span><span class="mclose">)</span></span></span></span></span></p>
+<p>where <span class="katex"><span class="katex-mathml"><math><semantics><mrow><mi>p</mi></mrow><annotation encoding="application/x-tex">p</annotation></semantics></math></span><span class="katex-html" aria-hidden="true"><span class="strut" style="height:0.43056em;"></span><span class="strut bottom" style="height:0.625em;vertical-align:-0.19444em;"></span><span class="base textstyle uncramped"><span class="mord mathit">p</span></span></span></span> is the predicted probability.</p>
+<p>BCE loss handles class imbalance by including a weighting term <span class="katex"><span class="katex-mathml"><math><semantics><mrow><mi>α</mi><mo>∈</mo><mo>[</mo><mn>0</mn><mo separator="true">,</mo><mn>1</mn><mo>]</mo></mrow><annotation encoding="application/x-tex">\alpha \in [0,1]</annotation></semantics></math></span><span class="katex-html" aria-hidden="true"><span class="strut" style="height:0.75em;"></span><span class="strut bottom" style="height:1em;vertical-align:-0.25em;"></span><span class="base textstyle uncramped"><span class="mord mathit" style="margin-right:0.0037em;">α</span><span class="mrel">∈</span><span class="mopen">[</span><span class="mord mathrm">0</span><span class="mpunct">,</span><span class="mord mathrm">1</span><span class="mclose">]</span></span></span></span> if <span class="katex"><span class="katex-mathml"><math><semantics><mrow><mi>y</mi><mo>=</mo><mn>1</mn></mrow><annotation encoding="application/x-tex">y=1</annotation></semantics></math></span><span class="katex-html" aria-hidden="true"><span class="strut" style="height:0.64444em;"></span><span class="strut bottom" style="height:0.8388800000000001em;vertical-align:-0.19444em;"></span><span class="base textstyle uncramped"><span class="mord mathit" style="margin-right:0.03588em;">y</span><span class="mrel">=</span><span class="mord mathrm">1</span></span></span></span> and <span class="katex"><span class="katex-mathml"><math><semantics><mrow><mn>1</mn><mo>−</mo><mi>α</mi></mrow><annotation encoding="application/x-tex">1 - \alpha</annotation></semantics></math></span><span class="katex-html" aria-hidden="true"><span class="strut" style="height:0.64444em;"></span><span class="strut bottom" style="height:0.72777em;vertical-align:-0.08333em;"></span><span class="base textstyle uncramped"><span class="mord mathrm">1</span><span class="mbin">−</span><span class="mord mathit" style="margin-right:0.0037em;">α</span></span></span></span> if <span class="katex"><span class="katex-mathml"><math><semantics><mrow><mi>y</mi><mo>=</mo><mn>0</mn></mrow><annotation encoding="application/x-tex">y = 0</annotation></semantics></math></span><span class="katex-html" aria-hidden="true"><span class="strut" style="height:0.64444em;"></span><span class="strut bottom" style="height:0.8388800000000001em;vertical-align:-0.19444em;"></span><span class="base textstyle uncramped"><span class="mord mathit" style="margin-right:0.03588em;">y</span><span class="mrel">=</span><span class="mord mathrm">0</span></span></span></span>. Interpolation between these two terms yields:</p>
+<p><span class="katex-display"><span class="katex"><span class="katex-mathml"><math><semantics><mrow><mtext><mi mathvariant="normal">B</mi><mi mathvariant="normal">C</mi><mi mathvariant="normal">E</mi></mtext><mo>(</mo><mi>y</mi><mo separator="true">,</mo><mi>p</mi><mo>)</mo><mo>=</mo><mo>[</mo><mo>(</mo><mn>2</mn><mi>α</mi><mo>−</mo><mn>1</mn><mo>)</mo><mi>p</mi><mo>+</mo><mo>(</mo><mn>1</mn><mo>−</mo><mi>α</mi><mo>)</mo><mo>]</mo><mtext><mi mathvariant="normal">C</mi><mi mathvariant="normal">E</mi></mtext><mo>(</mo><mi>y</mi><mo separator="true">,</mo><mi>p</mi><mo>)</mo></mrow><annotation encoding="application/x-tex">\text{BCE}(y,p) = [(2\alpha-1)p+(1-\alpha)]\text{CE}(y,p)
+</annotation></semantics></math></span><span class="katex-html" aria-hidden="true"><span class="strut" style="height:0.75em;"></span><span class="strut bottom" style="height:1em;vertical-align:-0.25em;"></span><span class="base displaystyle textstyle uncramped"><span class="text mord displaystyle textstyle uncramped"><span class="mord mathrm">B</span><span class="mord mathrm">C</span><span class="mord mathrm">E</span></span><span class="mopen">(</span><span class="mord mathit" style="margin-right:0.03588em;">y</span><span class="mpunct">,</span><span class="mord mathit">p</span><span class="mclose">)</span><span class="mrel">=</span><span class="mopen">[</span><span class="mopen">(</span><span class="mord mathrm">2</span><span class="mord mathit" style="margin-right:0.0037em;">α</span><span class="mbin">−</span><span class="mord mathrm">1</span><span class="mclose">)</span><span class="mord mathit">p</span><span class="mbin">+</span><span class="mopen">(</span><span class="mord mathrm">1</span><span class="mbin">−</span><span class="mord mathit" style="margin-right:0.0037em;">α</span><span class="mclose">)</span><span class="mclose">]</span><span class="text mord displaystyle textstyle uncramped"><span class="mord mathrm">C</span><span class="mord mathrm">E</span></span><span class="mopen">(</span><span class="mord mathit" style="margin-right:0.03588em;">y</span><span class="mpunct">,</span><span class="mord mathit">p</span><span class="mclose">)</span></span></span></span></span></p>
+<p>Focal Loss weights BCE by a focusing factor of <span class="katex"><span class="katex-mathml"><math><semantics><mrow><mo>(</mo><mn>1</mn><mo>−</mo><msub><mi>p</mi><mi>t</mi></msub><msup><mo>)</mo><mi>γ</mi></msup></mrow><annotation encoding="application/x-tex">(1-p_t)^\gamma</annotation></semantics></math></span><span class="katex-html" aria-hidden="true"><span class="strut" style="height:0.75em;"></span><span class="strut bottom" style="height:1em;vertical-align:-0.25em;"></span><span class="base textstyle uncramped"><span class="mopen">(</span><span class="mord mathrm">1</span><span class="mbin">−</span><span class="mord"><span class="mord mathit">p</span><span class="vlist"><span style="top:0.15em;margin-right:0.05em;margin-left:0em;"><span class="fontsize-ensurer reset-size5 size5"><span style="font-size:0em;">​</span></span><span class="reset-textstyle scriptstyle cramped"><span class="mord mathit">t</span></span></span><span class="baseline-fix"><span class="fontsize-ensurer reset-size5 size5"><span style="font-size:0em;">​</span></span>​</span></span></span><span class="mclose"><span class="mclose">)</span><span class="vlist"><span style="top:-0.363em;margin-right:0.05em;"><span class="fontsize-ensurer reset-size5 size5"><span style="font-size:0em;">​</span></span><span class="reset-textstyle scriptstyle uncramped"><span class="mord mathit" style="margin-right:0.05556em;">γ</span></span></span><span class="baseline-fix"><span class="fontsize-ensurer reset-size5 size5"><span style="font-size:0em;">​</span></span>​</span></span></span></span></span></span>, where <span class="katex"><span class="katex-mathml"><math><semantics><mrow><mi>γ</mi><mo>≥</mo><mn>0</mn></mrow><annotation encoding="application/x-tex">\gamma \ge 0</annotation></semantics></math></span><span class="katex-html" aria-hidden="true"><span class="strut" style="height:0.64444em;"></span><span class="strut bottom" style="height:0.8388800000000001em;vertical-align:-0.19444em;"></span><span class="base textstyle uncramped"><span class="mord mathit" style="margin-right:0.05556em;">γ</span><span class="mrel">≥</span><span class="mord mathrm">0</span></span></span></span> and <span class="katex"><span class="katex-mathml"><math><semantics><mrow><msub><mi>p</mi><mi>t</mi></msub></mrow><annotation encoding="application/x-tex">p_t</annotation></semantics></math></span><span class="katex-html" aria-hidden="true"><span class="strut" style="height:0.43056em;"></span><span class="strut bottom" style="height:0.625em;vertical-align:-0.19444em;"></span><span class="base textstyle uncramped"><span class="mord"><span class="mord mathit">p</span><span class="vlist"><span style="top:0.15em;margin-right:0.05em;margin-left:0em;"><span class="fontsize-ensurer reset-size5 size5"><span style="font-size:0em;">​</span></span><span class="reset-textstyle scriptstyle cramped"><span class="mord mathit">t</span></span></span><span class="baseline-fix"><span class="fontsize-ensurer reset-size5 size5"><span style="font-size:0em;">​</span></span>​</span></span></span></span></span></span> is <span class="katex"><span class="katex-mathml"><math><semantics><mrow><mi>p</mi></mrow><annotation encoding="application/x-tex">p</annotation></semantics></math></span><span class="katex-html" aria-hidden="true"><span class="strut" style="height:0.43056em;"></span><span class="strut bottom" style="height:0.625em;vertical-align:-0.19444em;"></span><span class="base textstyle uncramped"><span class="mord mathit">p</span></span></span></span> if <span class="katex"><span class="katex-mathml"><math><semantics><mrow><mi>y</mi><mo>=</mo><mn>0</mn></mrow><annotation encoding="application/x-tex">y = 0</annotation></semantics></math></span><span class="katex-html" aria-hidden="true"><span class="strut" style="height:0.64444em;"></span><span class="strut bottom" style="height:0.8388800000000001em;vertical-align:-0.19444em;"></span><span class="base textstyle uncramped"><span class="mord mathit" style="margin-right:0.03588em;">y</span><span class="mrel">=</span><span class="mord mathrm">0</span></span></span></span> and <span class="katex"><span class="katex-mathml"><math><semantics><mrow><mn>1</mn><mo>−</mo><mi>p</mi></mrow><annotation encoding="application/x-tex">1-p</annotation></semantics></math></span><span class="katex-html" aria-hidden="true"><span class="strut" style="height:0.64444em;"></span><span class="strut bottom" style="height:0.8388800000000001em;vertical-align:-0.19444em;"></span><span class="base textstyle uncramped"><span class="mord mathrm">1</span><span class="mbin">−</span><span class="mord mathit">p</span></span></span></span> if <span class="katex"><span class="katex-mathml"><math><semantics><mrow><mi>y</mi><mo>=</mo><mn>1</mn></mrow><annotation encoding="application/x-tex">y = 1</annotation></semantics></math></span><span class="katex-html" aria-hidden="true"><span class="strut" style="height:0.64444em;"></span><span class="strut bottom" style="height:0.8388800000000001em;vertical-align:-0.19444em;"></span><span class="base textstyle uncramped"><span class="mord mathit" style="margin-right:0.03588em;">y</span><span class="mrel">=</span><span class="mord mathrm">1</span></span></span></span> to addresses foreground-background imbalance. FCL is derived through interpolation between the binary cases of <span class="katex"><span class="katex-mathml"><math><semantics><mrow><msub><mi>p</mi><mi>t</mi></msub></mrow><annotation encoding="application/x-tex">p_t</annotation></semantics></math></span><span class="katex-html" aria-hidden="true"><span class="strut" style="height:0.43056em;"></span><span class="strut bottom" style="height:0.625em;vertical-align:-0.19444em;"></span><span class="base textstyle uncramped"><span class="mord"><span class="mord mathit">p</span><span class="vlist"><span style="top:0.15em;margin-right:0.05em;margin-left:0em;"><span class="fontsize-ensurer reset-size5 size5"><span style="font-size:0em;">​</span></span><span class="reset-textstyle scriptstyle cramped"><span class="mord mathit">t</span></span></span><span class="baseline-fix"><span class="fontsize-ensurer reset-size5 size5"><span style="font-size:0em;">​</span></span>​</span></span></span></span></span></span>:</p>
+<p><span class="katex-display"><span class="katex"><span class="katex-mathml"><math><semantics><mrow><mtext><mi mathvariant="normal">F</mi><mi mathvariant="normal">C</mi><mi mathvariant="normal">L</mi></mtext><mo>(</mo><mi>y</mi><mo separator="true">,</mo><mi>p</mi><mo>)</mo><mo>=</mo><msup><mrow><mo fence="true">∣</mo><mi>y</mi><mo>−</mo><mi>p</mi><mo fence="true">∣</mo></mrow><mi>γ</mi></msup><mtext><mi mathvariant="normal">B</mi><mi mathvariant="normal">C</mi><mi mathvariant="normal">E</mi></mtext><mo>(</mo><mi>y</mi><mo separator="true">,</mo><mi>p</mi><mo>)</mo></mrow><annotation encoding="application/x-tex">\text{FCL}(y,p) = \left|y-p\right|^\gamma \text{BCE}(y,p)
+</annotation></semantics></math></span><span class="katex-html" aria-hidden="true"><span class="strut" style="height:0.75em;"></span><span class="strut bottom" style="height:1em;vertical-align:-0.25em;"></span><span class="base displaystyle textstyle uncramped"><span class="text mord displaystyle textstyle uncramped"><span class="mord mathrm">F</span><span class="mord mathrm">C</span><span class="mord mathrm">L</span></span><span class="mopen">(</span><span class="mord mathit" style="margin-right:0.03588em;">y</span><span class="mpunct">,</span><span class="mord mathit">p</span><span class="mclose">)</span><span class="mrel">=</span><span class="minner"><span class="minner displaystyle textstyle uncramped"><span class="style-wrap reset-textstyle textstyle uncramped" style="top:0em;">∣</span><span class="mord mathit" style="margin-right:0.03588em;">y</span><span class="mbin">−</span><span class="mord mathit">p</span><span class="style-wrap reset-textstyle textstyle uncramped" style="top:0em;">∣</span></span><span class="vlist"><span style="top:-0.41300000000000003em;margin-right:0.05em;"><span class="fontsize-ensurer reset-size5 size5"><span style="font-size:0em;">​</span></span><span class="reset-textstyle scriptstyle uncramped"><span class="mord mathit" style="margin-right:0.05556em;">γ</span></span></span><span class="baseline-fix"><span class="fontsize-ensurer reset-size5 size5"><span style="font-size:0em;">​</span></span>​</span></span></span><span class="text mord displaystyle textstyle uncramped"><span class="mord mathrm">B</span><span class="mord mathrm">C</span><span class="mord mathrm">E</span></span><span class="mopen">(</span><span class="mord mathit" style="margin-right:0.03588em;">y</span><span class="mpunct">,</span><span class="mord mathit">p</span><span class="mclose">)</span></span></span></span></span></p>
+<p>FCL is equivalent to FL when the class targets are one-hot labels, but interpolates the loss for probability targets.
+Finally, FL is normalized by the number of anchors assigned to ground-truth boxes (Section 4, <dt-cite key="retinanet"></dt-cite>). Instead, FCL is normalized by the total probability attributed to anchors in the class tensor. This weights each anchor by its inferred probability of being a ground-truth box.</p>
+<h2>V. Task Policy Models and Experiments</h2>
+<p>We test the following hypotheses: 1) the value of sim-to-real at various data sizes by comparing robotics models trained with RetinaGAN vs without RetinaGAN 2) with purely sim-to-real data, how models trained with various GANs perform 3) transfer to other tasks.</p>
+<p>We begin with training and evaluating RetinaGAN for RL grasping. We then proceed by applying the same RetinaGAN model to RL pushing and finally re-train on an IL door opening task. See the Appendix for further details on training and model architecture.</p>
+<h3>A. Reinforcement Learning: Grasping</h3>
+<p>We use the distributed reinforcement learning method Q2-Opt <dt-cite key="bodnar2019quantile"></dt-cite>, an extension to QT-Opt <dt-cite key="kalashnikov2018qtopt"></dt-cite>, to train a vision based task model for instance grasping. In the grasping task, a robot is positioned in front of one of three bins within a trash sorting station and attempts to grasp targeted object instances. The RGB image and a binary mask for the grasp target is input into the network. Real world object classes are focused on cups, cans, and bottles, although real training data is exposed to a long tail of discarded objects. Grasps in simulation are performed with the PyBullet <dt-cite key="coumans2017pybullet"></dt-cite> physics engine, with 9 to 18 spawned objects per scene. Example images are visualized in Fig. 5.</p>
+<p>When using real data, we train RetinaGAN on 135,000 off-policy real grasping episodes and the Q2-Opt task model on 211,000 real episodes. We also run a low data experiment using 10,000 real episodes for training both RetinaGAN and Q2-Opt. We run distributed simulation to generate one-half to one million on-policy training episodes for RetinaGAN and one to two million for Q2-Opt.</p>
+<p>We evaluate with six robots and sorting stations. Two robots are positioned in front of each of the three waste bins, and a human manually selects a cup, can, or bottle to grasp. Each evaluation includes thirty grasp attempts for each class, for ninety total. By assuming each success-failure experience is an independent Bernouili trial, we can estimate the sample standard deviation as <span class="katex"><span class="katex-mathml"><math><semantics><mrow><msqrt><mrow><mi>q</mi><mo>(</mo><mn>1</mn><mo>−</mo><mi>q</mi><mo>)</mo><mi mathvariant="normal">/</mi><mo>(</mo><mi>n</mi><mo>−</mo><mn>1</mn><mo>)</mo></mrow></msqrt></mrow><annotation encoding="application/x-tex">\sqrt{q(1-q)/(n-1)}</annotation></semantics></math></span><span class="katex-html" aria-hidden="true"><span class="strut" style="height:0.9350050000000001em;"></span><span class="strut bottom" style="height:1.24001em;vertical-align:-0.3050049999999999em;"></span><span class="base textstyle uncramped"><span class="sqrt mord"><span class="sqrt-sign" style="top:-0.04500500000000007em;"><span class="style-wrap reset-textstyle textstyle uncramped"><span class="delimsizing size1">√</span></span></span><span class="vlist"><span style="top:0em;"><span class="fontsize-ensurer reset-size5 size5"><span style="font-size:1em;">​</span></span><span class="mord textstyle cramped"><span class="mord mathit" style="margin-right:0.03588em;">q</span><span class="mopen">(</span><span class="mord mathrm">1</span><span class="mbin">−</span><span class="mord mathit" style="margin-right:0.03588em;">q</span><span class="mclose">)</span><span class="mord mathrm">/</span><span class="mopen">(</span><span class="mord mathit">n</span><span class="mbin">−</span><span class="mord mathrm">1</span><span class="mclose">)</span></span></span><span style="top:-0.855005em;"><span class="fontsize-ensurer reset-size5 size5"><span style="font-size:1em;">​</span></span><span class="reset-textstyle textstyle uncramped sqrt-line"></span></span><span class="baseline-fix"><span class="fontsize-ensurer reset-size5 size5"><span style="font-size:1em;">​</span></span>​</span></span></span></span></span></span>, where <span class="katex"><span class="katex-mathml"><math><semantics><mrow><mi>q</mi></mrow><annotation encoding="application/x-tex">q</annotation></semantics></math></span><span class="katex-html" aria-hidden="true"><span class="strut" style="height:0.43056em;"></span><span class="strut bottom" style="height:0.625em;vertical-align:-0.19444em;"></span><span class="base textstyle uncramped"><span class="mord mathit" style="margin-right:0.03588em;">q</span></span></span></span> is the average failure rate and <span class="katex"><span class="katex-mathml"><math><semantics><mrow><mi>n</mi></mrow><annotation encoding="application/x-tex">n</annotation></semantics></math></span><span class="katex-html" aria-hidden="true"><span class="strut" style="height:0.43056em;"></span><span class="strut bottom" style="height:0.43056em;vertical-align:0em;"></span><span class="base textstyle uncramped"><span class="mord mathit">n</span></span></span></span> is the number of trials.</p>
+<div class="figure">
+<img src="assets/fig/GAN_grasp2.png" style="margin: 0; width: 100%;"/>
+<figcaption>
+Fig. 5. Sampled, unpaired images for the grasping task at various scales translated with either the sim-to-real (left) or real-to-sim (right) generator. Compared to other methods, the sim-to-real RetinaGAN consistently preserves object textures and better reconstructs real features. The real-to-sim RetinaGAN is able to preserve all object structure in cluttered scenes, and it correctly translates details of the robot gripper and floor.
+</figcaption>
+</div>
+<div class="figure">
+<img src="assets/fig/table_1.png" style="display: block; width: 100%;"/>
+</div>
+<p>We use the RL grasping task to measure the sim-to-real gap and compare methods in the following scenarios, which are displayed in Table I:</p>
+<ol>
+<li>Train by mixing 10K real episodes with simulation to gauge data efficiency in the limited data regime.</li>
+<li>Train by mixing 135K+ real grapsing episodes with simulation to investigate scalability with data, data efficiency, and performance against real data baselines.</li>
+<li>Train Q2-Opt with only simulation-only to compare between RetinaGAN and other sim-to-real methods.</li>
+</ol>
+<p>In the sim-only setup, we train with fixed light position and object textures, though we apply photometric distortions including brightness, saturation, hue, contrast, and noise. In simulation evaluation, a Q2-Opt model achieves 92% instance grasping success on cups, cans, and bottles. A performance of 18.9% on the real object equivalents indicates a significant sim-to-real gap from training in simulation alone.</p>
+<p>We compare against baselines in domain randomization and domain adaptation techniques. Domain randomization includes variations in texture and light positioning.</p>
+<p>On the limited 10K episode dataset, RetinaGAN+Real achieves 65.6%, showing significant performance improvement compared to Real-only.
+When training on the large real dataset, RetinaGAN achieves 80%, demonstrating scalability with more data. Additionally, we find that RetinaGAN+Real with 10K examples outperforms Sim+Real with 135K+ episodes, showing more than 10X data efficiency.</p>
+<p>We proceed to compare our method with other domain adaptation methods; here, we train Q2-Opt solely on sim-to-real translated data for a clear comparison. RL-CycleGAN is trained with the same indiscriminate grasping task loss as in <dt-cite key="rao2020rlcyclegan"></dt-cite>, but used to adapt on instance grasping. This could explain its relatively lower improvement from results in <dt-cite key="rao2020rlcyclegan"></dt-cite>. RetinaGAN achieves 80%, outperforming other methods by over two standard deviations, and interestingly, is on par with RetinaGAN+Real. We hypothesize that the knowledge of the real data was largely captured during RetinaGAN training, and the near on-policy simulation data is enough to train a high performing model.</p>
+<h3>B. Reinforcement Learning: 3D Object Pushing</h3>
+<div class="figure">
+<img src="assets/fig/GAN_pushing.png" style="margin: 0; width: 100%;"/>
+<figcaption>
+Fig. 6. Example unpaired images from the object pushing task, where the robot needs to push an upright object to the goal position, the red dot, without knocking it over.
+</figcaption>
+</div>
+<p>We investigate the transfer capability of RetinaGAN within the same sorting station environment by solving a 3D object pushing task. We test the same RetinaGAN model with this visually similar but distinct robotic pushing task and show that it may be reused without fine-tuning. No additional real data is required for both the pushing task and RetinaGAN.</p>
+<p>The pushing task trains purely in simulation, using a scene with a single bottle placed within the center bin of the sorting station and the same Q2-Opt RL framework (Fig. 6). Success is achieved when the object remains upright and is pushed to within 5 centimeters of the goal location indicated by a red marker. We stack the initial image (with the goal marker) and current RGB image as input. For both sim and real world evaluation, the robot needs to push a randomly placed tea bottle to a target location in the bin without knocking it over. Further details are described in <dt-cite key="COCOI"></dt-cite>, a concurrent submission.</p>
+<div class="figure">
+<img src="assets/fig/table_2.png" style="display: block; width: 100%;"/>
+</div>
+<p>Evaluation results are displayed in Table II. We train a Q2-Opt policy to perform the pushing task in simulation only and achieve 90% sim success. When deploying the sim-only RL policy to real, we get 0% success, revealing a large sim-to-real gap. By applying RetinaGAN to the RL training data, we create a policy achieving 90% success, demonstrating strong transfer and understanding of the real domain.</p>
+<h3>C. Imitation Learning: Door Opening</h3>
+<p>We investigate RetinaGAN with a mis-matched object detector (trained on recycling objects) on an door opening task using a supervised learning form of behavioral cloning and imitation learning (IL). This task is set in a dramatically different visual domain, policy learning framework and algorithm, and neural network architecture. It involves a fixed, extended robot arm with a policy controlling the wheels of the robot base to open the doors of, and enter, conference rooms (Fig. 7).</p>
+<p>The supervised learning policy is represented by a ResNet-FiLM architecture with 18 layers <dt-cite key="film"></dt-cite>.
+Both the RetinaGAN model and the supervised learning policy are trained on 1,500 human demonstrations in simulation and 29,000 human demonstrations on real conference doors. We evaluate on three conference rooms seen within the training demonstrations. We train and evaluate on three conference rooms with both left and right-swinging doors, for ten trials each and thirty total trials.</p>
+<div class="figure">
+<img src="assets/fig/GAN_Door_Opening.png" style="margin: 0; width: 100%;"/>
+<figcaption>
+Fig. 7. Images sampled from the door opening task in simulation (red border) and real (blue border). Generated images from two separately trained RetinaGAN models highlight prediction diversity in features like lighting or background; this diversity is also present in the real world dataset.
+</figcaption>
+</div>
+<div class="figure">
+<img src="assets/fig/table_3.png" style="display: block; width: 100%;"/>
+</div>
+<p>With the door opening task, we explore how our domain adapation method performs in an entirely novel domain, training method, and action space, with a relatively low amount of real data (1,500 real demonstrations). We train the RetinaGAN model using the same object detector trained on recycling objects. This demonstrates the capacity to re-use labeled robot bounding box data across environments, eliminating further human labeling effort. Within door opening images, the perception model produces confident detections only for the the robot arm, but we hypothesize that structures like door frames could be maintained by consistency in low-probability prediction regimes.</p>
+<p>Compared to baselines without consistency loss, RetinaGAN strongly preserves room structures and door locations, while baseline methods lose this consistency (see Appendix).
+This semantic inconsistency in GAN baselines presents a safety risk in real world deployment, so we did not attempt evaluations with these models.</p>
+<p>We then evaluate IL models trained with different data sources and domain adaptors, and displayed the results in Table III. An IL model trained on demonstrations in simulation and evaluated in simulation achieves 98% success. The same model fails in real with no success cases - showing a large sim-to-real gap.</p>
+<p>By mixing real world demonstrations in IL model training, we achieve 75% success on conference room doors seen in training time. We achieve a comparable success rate, 76.7%, when applying RetinaGAN.</p>
+<p>By training on data from three separate RetinaGAN models with different random seeds and consistency loss weights (called Ensemble-RetinaGAN), we are able to achieve 93.3% success rate. In the low data regime, RetinaGAN can oscillate between various reconstructed semantics and ambiguity in lighting and colors as shown in Fig. 7. We hypothesize that mixing data from multiple GANs adds diversity and robustness, aiding in generalization. Finally, we attempt Ensemble-RetinaGAN without any real data for training the IL model. We achieve 96.6%, within margin of error of the Ensemble-RetinaGAN+Real result.</p>
+<h2>VI. Conclusions</h2>
+<p>RetinaGAN is an object-aware sim-to-real adaptation technique which transfers robustly across environments and tasks, even with limited real data. We evaluate on three tasks and show 80% success on instance grasping, a 12 percentage-point improvement upon baselines. Further extensions may look into pixel-level perception consistency or other modalities like depth. Another direction of work in task and domain-agnostic transfer could extend RetinaGAN to perform well in a visual environment unseen at training time.</p>
+<h2>Appendix</h2>
+<h3>A. Door Opening Figure</h3>
+<p>See Fig. 8 for example of semantic structure distortions when training the door opening task with CycleGAN.</p>
+<div class="figure">
+<img src="assets/fig/GAN_DOOR_OPENING_CGAN.png" style="margin: 0; width: 100%;"/>
+<figcaption>
+Fig. 8. CycleGAN can distort semantic structure when trained on door opening images, in the low data regime. Images on the right are transfered results of the simulated image on the left.
+</figcaption>
+</div>
+<h3>B. Perception Model Training</h3>
+<p>Hyperparameters used in object detection model training are listed in Table IV. We use default augmentation parameters from <dt-cite key="retinanet"></dt-cite>, including a scale range of 0.8 to 1.2. Among the 59 classes, the following are frequently used: robot, bottle, bowl, can, cup, bag/wrapper, bowl, and plate. Other classes appear sparesely or not at all.</p>
+<div class="figure">
+<img src="assets/fig/table_4.png" style="display: block; width: 100%;"/>
+</div>
+<h3>C. RetinaGAN Model Training</h3>
+<p>We train RetinaGAN with similar parameters to those described in Appendix A of <dt-cite key="rao2020rlcyclegan"></dt-cite>. We generate simulation images with the following object set (and counts): paper bags (1), bottles (9), bowls (1), napkins (1), cans (12), cups (6), containers (2), plates (1), and wrappers (10). Each training batch includes 256 simulation and 256 real images. Photometric distortions are defined in the <a href="https://github.com/google-research/tensor2robot/blob/master/preprocessors/image_transformations.py">Tensor2Robot framework</a>.</p>
+<div class="figure">
+<img src="assets/fig/table_5.png" style="display: block; width: 100%;"/>
+</div>
+<h3>D. Q2-Opt RL Model Training</h3>
+<p>We use the Q2R-Opt <dt-cite key="bodnar2019quantile"></dt-cite> model and training pipeline for both the grasping and pushing tasks, with the same hyperparameters. We train on the same simulated object set as in the RetinaGAN setup.</p>
+<p>When using the full real dataset, we sample each minibatch from simulation episodes with a 50% weight and real episodes with a 50% weight. With the restricted 10K episode dataset, we sample from simulation with 20% weight and real with 80% weight, as to not overfit on the smaller real dataset.
+We did not tune these ratios, as in prior experiments, we found that careful tuning was not required.</p>
+<h3>E. ResNet-FiLM IL Model Training</h3>
+<p>We train IL with the ResNet-FiLM <dt-cite key="film"></dt-cite> model with a ResNet-18 architecture defined in the <a href="https://github.com/google-research/tensor2robot/blob/master/layers/film_resnet_model.py">Tensor2Robot framework</a>. For training RetinaGAN and Multi-RetinaGAN, we mix real demonstrations, simulated demonstrations, and RetinaGAN-adapted simulated demonstrations. We use a lower 20% weight for real data (because of the small dataset size) and evenly weight simulated and adapted demonstrations. The action space is the 2D movement of the robot base. Additional details will be provided in an as-yet unreleased paper; this work focuses on the benefits of CycleGAN-adapted data independently of whether policies are trained with IL or RL.</p>
+<h3>F. Evaluation</h3>
+<p>For grasping, we evaluate with the station setup in Fig. 9. Each setup is replicated three times (with potentially different object brands/instances, but the same classes), and one robot positioned in front of each bin. We target the robot to only grasp the cup, can, and bottle, for a total of eighteen grasps. This is repeated five times for ninety total grasps.</p>
+<div class="figure">
+<img src="assets/fig/eval_setup.png" style="margin: 0; width: 100%;"/>
+<figcaption>
+Fig. 9. The two evaluation station setups displaying the object classes present in each bin.
+</figcaption>
+</div>
+<p>For pushing, we evaluate with a single Ito En Green Tea Bottle filled 25% full of water.</p>
+<p>For door opening, we evaluate on three real world conference room doors. Two doors swing rightwards and one door swings leftwards. The episode is judged as successful if the robot autonomously pushes the door open and the robot base enters the room.</p>
+</dt-article>
+<dt-appendix>
+<h2>Acknowledgments</h2>
+<p>We thank Noah Brown, Christopher Paguyo, Armando Fuentes, and Sphurti More for overseeing robot operations, and Daniel Kappler, Paul Wohlhart, and Alexander Herzog for helpful discussions. We thank Chris Harris and Alex Irpan for comments on the manuscript.</p>
+<p>This article was prepared using the <a href="https://distill.pub">Distill</a> <a href="https://github.com/distillpub/template">template</a>.</p>
+<h3 id="citation">Citation</h3>
+<p>For attribution in academic contexts, please cite this work as</p>
+<pre class="citation short">Ho et al., "RetinaGAN: An Object-aware Approach to Sim-to-Real Transfer", 2020.</pre>
+<p>BibTeX citation</p>
+<pre class="citation long">@misc{ho2020retinagan,
+  title={RetinaGAN: An Object-aware Approach to Sim-to-Real Transfer},
+  author={Daniel Ho and Kanishka Rao and Zhuo Xu and Eric Jang and Mohi Khansari and Yunfei Bai},
+  year={2020},
+  url={https://retinagan.github.io}
+}</pre>
+</dt-appendix>
+</dt-appendix>
+</body>
+<script type="text/bibliography">
+@misc{rao2020rlcyclegan,
+    title={RL-CycleGAN: Reinforcement Learning Aware Simulation-To-Real}, 
+    author={Kanishka Rao and Chris Harris and Alex Irpan and Sergey Levine and Julian Ibarz and Mohi Khansari},
+    year={2020},
+    eprint={2006.09001},
+    archivePrefix={arXiv},
+    primaryClass={cs.RO}
+}
+@misc{hoffman2017cycada,
+    title={CyCADA: Cycle-Consistent Adversarial Domain Adaptation}, 
+    author={Judy Hoffman and Eric Tzeng and Taesung Park and Jun-Yan Zhu and Phillip Isola and Kate Saenko and Alexei A. Efros and Trevor Darrell},
+    year={2017},
+    eprint={1711.03213},
+    archivePrefix={arXiv},
+    primaryClass={cs.CV}
+}
+@INPROCEEDINGS{efficientdet,
+author={M. Tan and R. Pang and Q. V. Le},
+booktitle={2020 IEEE/CVF Conference on Computer Vision and Pattern Recognition (CVPR)}, 
+title={EfficientDet: Scalable and Efficient Object Detection}, 
+year={2020},
+pages={10778-10787},}
+@INPROCEEDINGS{retinanet,
+author={T. Lin and P. Goyal and R. Girshick and K. He and P. Dollár},
+booktitle={2017 IEEE International Conference on Computer Vision (ICCV)}, 
+title={Focal Loss for Dense Object Detection}, 
+year={2017},
+pages={2999-3007},}
+@INPROCEEDINGS{b8202133,
+author={J. Tobin and R. Fong and A. Ray and J. Schneider and W. Zaremba and P. Abbeel},
+booktitle={2017 IEEE/RSJ International Conference on Intelligent Robots and Systems (IROS)}, 
+title={Domain randomization for transferring deep neural networks from simulation to the real world}, 
+year={2017},
+number={},
+pages={23-30},}
+
+@misc{matas2018simtoreal,
+    title={Sim-to-Real Reinforcement Learning for Deformable Object Manipulation}, 
+    author={Jan Matas and Stephen James and Andrew J. Davison},
+    year={2018},
+    eprint={1806.07851},
+    archivePrefix={arXiv},
+    primaryClass={cs.RO}
+}
+
+@inproceedings{James2017TransferringEV,
+title={Transferring End-to-End Visuomotor Control from Simulation to Real World for a Multi-Stage Task},
+author={Stephen James and A. Davison and Edward Johns},
+booktitle={CoRL},
+year={2017}
+}
+
+@INPROCEEDINGS{b8578591,
+author={F. Sadeghi and A. Toshev and E. Jang and S. Levine},
+booktitle={2018 IEEE/CVF Conference on Computer Vision and Pattern Recognition}, 
+title={Sim2Real Viewpoint Invariant Visual Servoing by Recurrent Control}, 
+year={2018},
+pages={4691-4699},}
+
+@ARTICLE{b7078994,
+author={V. M. Patel and R. Gopalan and R. Li and R. Chellappa},
+journal={IEEE Signal Processing Magazine}, 
+title={Visual Domain Adaptation: A survey of recent advances}, 
+year={2015},
+volume={32},
+number={3},
+pages={53-69},}
+
+
+@INPROCEEDINGS{b6126344,
+author={R. Gopalan and Ruonan Li and R. Chellappa},
+booktitle={2011 International Conference on Computer Vision}, 
+title={Domain adaptation for object recognition: An unsupervised approach}, 
+year={2011},
+pages={999-1006},}
+
+@misc{bousmalis2017unsupervised,
+    title={Unsupervised Pixel-Level Domain Adaptation with Generative Adversarial Networks}, 
+    author={Konstantinos Bousmalis and Nathan Silberman and David Dohan and Dumitru Erhan and Dilip Krishnan},
+    year={2017},
+    eprint={1612.05424},
+    archivePrefix={arXiv},
+    primaryClass={cs.CV}
+}
+
+@misc{yoo2016pixellevel,
+    title={Pixel-Level Domain Transfer}, 
+    author={Donggeun Yoo and Namil Kim and Sunggyun Park and Anthony S. Paek and In So Kweon},
+    year={2016},
+    eprint={1603.07442},
+    archivePrefix={arXiv},
+    primaryClass={cs.CV}
+}
+
+@InProceedings{pmlr-v37-long15,
+  title={Learning Transferable Features with Deep Adaptation Networks},
+  author={Mingsheng Long and Yue Cao and Jianmin Wang and Michael Jordan}, pages={97--105}, year={2015}, editor={Francis Bach and David Blei}, volume={37}, series={Proceedings of Machine Learning Research}, address={Lille, France}, month={07--09 Jul}, publisher={PMLR}, pdf={http://proceedings.mlr.press/v37/long15.pdf}, url={http://proceedings.mlr.press/v37/long15.html} }
+
+@incollection{NIPS2014_5423,
+title={Generative Adversarial Nets},
+author={Goodfellow, Ian and Pouget-Abadie, Jean and Mirza, Mehdi and Xu, Bing and Warde-Farley, David and Ozair, Sherjil and Courville, Aaron and Bengio, Yoshua},
+booktitle={Advances in Neural Information Processing Systems 27},
+editor={Z. Ghahramani and M. Welling and C. Cortes and N. D. Lawrence and K. Q. Weinberger},
+pages={2672--2680},
+year={2014},
+publisher={Curran Associates, Inc.},
+url={http://papers.nips.cc/paper/5423-generative-adversarial-nets.pdf}
+}
+
+@misc{zhang2019selfattention,
+    title={Self-Attention Generative Adversarial Networks}, 
+    author={Han Zhang and Ian Goodfellow and Dimitris Metaxas and Augustus Odena},
+    year={2019},
+    eprint={1805.08318},
+    archivePrefix={arXiv},
+    primaryClass={stat.ML}
+}
+
+@misc{brock2019large,
+    title={Large Scale GAN Training for High Fidelity Natural Image Synthesis}, 
+    author={Andrew Brock and Jeff Donahue and Karen Simonyan},
+    year={2019},
+    eprint={1809.11096},
+    archivePrefix={arXiv},
+    primaryClass={cs.LG}
+}
+
+@misc{zhu2020unpaired,
+    title={Unpaired Image-to-Image Translation using Cycle-Consistent Adversarial Networks}, 
+    author={Jun-Yan Zhu and Taesung Park and Phillip Isola and Alexei A. Efros},
+    year={2020},
+    eprint={1703.10593},
+    archivePrefix={arXiv},
+    primaryClass={cs.CV}
+}
+
+@inproceedings{b46539,
+title={CycleGAN, a Master of Steganography},
+author={Casey Chu and Andrey Zhmoginov and Mark Sandler},
+year={2017},
+URL={https://arxiv.org/abs/1712.02950}
+}
+
+@INPROCEEDINGS{james2019sim,
+author={S. James and P. Wohlhart and M. Kalakrishnan and D. Kalashnikov and A. Irpan and J. Ibarz and S. Levine and R. Hadsell and K. Bousmalis},
+booktitle={2019 IEEE/CVF Conference on Computer Vision and Pattern Recognition (CVPR)}, 
+title={Sim-To-Real via Sim-To-Sim: Data-Efficient Robotic Grasping via Randomized-To-Canonical Adaptation Networks}, 
+year={2019},
+pages={12619-12629},}
+
+@inproceedings{bousmalis2018using,
+title={Using Simulation and Domain Adaptation to Improve Efficiency of Deep Robotic Grasping},
+author={Konstantinos Bousmalis and Alex Irpan and Paul Wohlhart and Yunfei Bai and Matthew Kelcey and Mrinal Kalakrishnan and Laura Downs and Julian Ibarz and Peter Pastor Sampedro and Kurt Konolige and Sergey Levine and Vincent Vanhoucke},
+year={2018},
+URL={https://arxiv.org/abs/1709.07857}
+}
+
+@ARTICLE{b6672028,
+author={J. Bohg and A. Morales and T. Asfour and D. Kragic},
+journal={IEEE Transactions on Robotics}, 
+title={Data-Driven Grasp Synthesis—A Survey}, 
+year={2014},
+volume={30},
+number={2},
+pages={289-309},}
+
+@misc{mahler2017dexnet,
+    title={Dex-Net 2.0: Deep Learning to Plan Robust Grasps with Synthetic Point Clouds and Analytic Grasp Metrics}, 
+    author={Jeffrey Mahler and Jacky Liang and Sherdil Niyaz and Michael Laskey and Richard Doan and Xinyu Liu and Juan Aparicio Ojea and Ken Goldberg},
+    year={2017},
+    eprint={1703.09312},
+    archivePrefix={arXiv},
+    primaryClass={cs.RO}
+}
+
+@misc{lenz2014deep,
+    title={Deep Learning for Detecting Robotic Grasps}, 
+    author={Ian Lenz and Honglak Lee and Ashutosh Saxena},
+    year={2014},
+    eprint={1301.3592},
+    archivePrefix={arXiv},
+    primaryClass={cs.LG}
+}
+
+@misc{kalashnikov2018qtopt,
+    title={QT-Opt: Scalable Deep Reinforcement Learning for Vision-Based Robotic Manipulation}, 
+    author={Dmitry Kalashnikov and Alex Irpan and Peter Pastor and Julian Ibarz and Alexander Herzog and Eric Jang and Deirdre Quillen and Ethan Holly and Mrinal Kalakrishnan and Vincent Vanhoucke and Sergey Levine},
+    year={2018},
+    eprint={1806.10293},
+    archivePrefix={arXiv},
+    primaryClass={cs.LG}
+}
+
+@article{bodnar2019quantile,
+title={Quantile QT-Opt for Risk-Aware Vision-Based Robotic Grasping},
+author={Cristian Bodnar and Adrian Li and Karol Hausman and Peter Pastor and Mrinal Kalakrishnan},
+journal={ArXiv},
+year={2019},
+volume={abs/1910.02787}
+}
+
+@misc{andrychowicz2018hindsight,
+    title={Hindsight Experience Replay}, 
+    author={Marcin Andrychowicz and Filip Wolski and Alex Ray and Jonas Schneider and Rachel Fong and Peter Welinder and Bob McGrew and Josh Tobin and Pieter Abbeel and Wojciech Zaremba},
+    year={2018},
+    eprint={1707.01495},
+    archivePrefix={arXiv},
+    primaryClass={cs.LG}
+}
+
+@inproceedings{kuo2019shapemask,
+title={Shapemask: Learning to segment novel objects by refining shape priors},
+author={Kuo, Weicheng and Angelova, Anelia and Malik, Jitendra and Lin, Tsung-Yi},
+booktitle={Proceedings of the IEEE International Conference on Computer Vision},
+pages={9207--9216},
+year={2019}
+}
+
+@misc{he2018mask,
+    title={Mask R-CNN}, 
+    author={Kaiming He and Georgia Gkioxari and Piotr Dollár and Ross Girshick},
+    year={2018},
+    eprint={1703.06870},
+    archivePrefix={arXiv},
+    primaryClass={cs.CV}
+}
+
+@misc{lin2017feature,
+    title={Feature Pyramid Networks for Object Detection}, 
+    author={Tsung-Yi Lin and Piotr Dollár and Ross Girshick and Kaiming He and Bharath Hariharan and Serge Belongie},
+    year={2017},
+    eprint={1612.03144},
+    archivePrefix={arXiv},
+    primaryClass={cs.CV}
+}
+
+@misc{tan2020efficientnet,
+    title={EfficientNet: Rethinking Model Scaling for Convolutional Neural Networks}, 
+    author={Mingxing Tan and Quoc V. Le},
+    year={2020},
+    eprint={1905.11946},
+    archivePrefix={arXiv},
+    primaryClass={cs.LG}
+}
+
+@book{elsr,
+added-at={2008-05-16T16:17:42.000+0200},
+address={New York, NY, USA},
+author={Hastie, Trevor and Tibshirani, Robert and Friedman, Jerome},
+biburl={https://www.bibsonomy.org/bibtex/2f58afc5c9793fcc8ad8389824e57984c/sb3000},
+interhash={d585aea274f2b9b228fc1629bc273644},
+intrahash={f58afc5c9793fcc8ad8389824e57984c},
+keywords={ml statistics},
+publisher={Springer New York Inc.},
+series={Springer Series in Statistics},
+timestamp={2008-05-16T16:17:43.000+0200},
+title={The Elements of Statistical Learning},
+year={2001}
+}
+
+@misc{coumans2017pybullet,
+title={Pybullet, a python module for physics simulation in robotics, games and machine learning},
+author={Coumans, Erwin and Bai, Yunfei},
+year={2017}
+}
+
+
+@article{akkaya2019solving,
+title={Solving rubik's cube with a robot hand},
+author={Akkaya, Ilge and Andrychowicz, Marcin and Chociej, Maciek and Litwin, Mateusz and McGrew, Bob and Petron, Arthur and Paino, Alex and Plappert, Matthias and Powell, Glenn and Ribas, Raphael and others},
+journal={arXiv preprint arXiv:1910.07113},
+year={2019}
+}
+
+@inproceedings{fang2018multi,
+title={Multi-task domain adaptation for deep learning of instance grasping from simulation},
+author={Fang, Kuan and Bai, Yunfei and Hinterstoisser, Stefan and Savarese, Silvio and Kalakrishnan, Mrinal},
+booktitle={2018 IEEE International Conference on Robotics and Automation (ICRA)},
+pages={3516--3523},
+year={2018},
+organization={IEEE}
+}
+
+@article{yan2019data,
+title={Data-efficient learning for sim-to-real robotic grasping using deep point cloud prediction networks},
+author={Yan, Xinchen and Khansari, Mohi and Hsu, Jasmine and Gong, Yuanzheng and Bai, Yunfei and Pirk, S{\"o}ren and Lee, Honglak},
+journal={arXiv preprint arXiv:1906.08989},
+year={2019}
+}
+
+@misc{film,
+    title={FiLM: Visual Reasoning with a General Conditioning Layer}, 
+    author={Ethan Perez and Florian Strub and Harm de Vries and Vincent Dumoulin and Aaron Courville},
+    year={2017},
+    eprint={1709.07871},
+    archivePrefix={arXiv},
+    primaryClass={cs.CV}
+}
+
+@article{levine2018learning,
+title={Learning hand-eye coordination for robotic grasping with deep learning and large-scale data collection},
+author={Levine, Sergey and Pastor, Peter and Krizhevsky, Alex and Ibarz, Julian and Quillen, Deirdre},
+journal={The International Journal of Robotics Research},
+volume={37},
+number={4-5},
+pages={421--436},
+year={2018},
+publisher={SAGE Publications Sage UK: London, England}
+}
+
+@inproceedings{pinto2016supersizing,
+title={Supersizing self-supervision: Learning to grasp from 50k tries and 700 robot hours},
+author={Pinto, Lerrel and Gupta, Abhinav},
+booktitle={2016 IEEE international conference on robotics and automation (ICRA)},
+pages={3406--3413},
+year={2016},
+organization={IEEE}
+}
+
+@misc{yan2018learning,
+    title={Learning 6-DOF Grasping Interaction via Deep Geometry-aware 3D Representations}, 
+    author={Xinchen Yan and Jasmine Hsu and Mohi Khansari and Yunfei Bai and Arkanath Pathak and Abhinav Gupta and James Davidson and Honglak Lee},
+    year={2018},
+    eprint={1708.07303},
+    archivePrefix={arXiv},
+    primaryClass={cs.RO}
+}
+
+@misc{khansari2020action,
+    title={Action Image Representation: Learning Scalable Deep Grasping Policies with Zero Real World Data}, 
+    author={Mohi Khansari and Daniel Kappler and Jianlan Luo and Jeff Bingham and Mrinal Kalakrishnan},
+    year={2020},
+    eprint={2005.06594},
+    archivePrefix={arXiv},
+    primaryClass={cs.RO}
+}
+@misc{COCOI,
+    title={COCOI: Contact-aware Online Context Inference for Generalizable Non-planar Pushing}, 
+    author={Zhuo Xu and Wenhao Yu and Alexander Herzog and Wenlong Lu and Chuyuan Fu and Masayoshi Tomizuka and Yunfei Bai and C. Karen Liu and Daniel Ho},
+    year={2020},
+}
+@misc{ronneberger2015unet,
+    title={U-Net: Convolutional Networks for Biomedical Image Segmentation}, 
+    author={Olaf Ronneberger and Philipp Fischer and Thomas Brox},
+    year={2015},
+    eprint={1505.04597},
+    archivePrefix={arXiv},
+    primaryClass={cs.CV}
+}
+
+
+
+
+</script>
+<script src="lib/blazy.js"></script>
+<script>
+  var bLazy = new Blazy({
+    success: function(){
+      updateCounter();
+    }
+  });
+  var imageLoaded = 0;
+  function updateCounter() {
+    imageLoaded++;
+    console.log("blazy image loaded: "+imageLoaded);
+  }
+</script>
