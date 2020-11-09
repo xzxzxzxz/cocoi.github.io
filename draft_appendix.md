@@ -13,8 +13,11 @@ For attribution in academic contexts, please cite this work as
 BibTeX citation
 
 <pre class="citation long">@misc{ho2020retinagan,
-  title={RetinaGAN: An Object-aware Approach to Sim-to-Real Transfer},
+  title={RetinaGAN: An Object-aware Approach to Sim-to-Real Transfer}, 
   author={Daniel Ho and Kanishka Rao and Zhuo Xu and Eric Jang and Mohi Khansari and Yunfei Bai},
   year={2020},
-  url={https://retinagan.github.io}
+  eprint={2011.03148},
+  archivePrefix={arXiv},
+  primaryClass={cs.RO},
+  url={https://arxiv.org/abs/2011.03148}
 }</pre>
