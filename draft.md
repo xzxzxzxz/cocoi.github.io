@@ -21,6 +21,15 @@ domain.
 
 ______
 
+## Video
+
+
+<p align="center">
+<iframe width="560" height="315" src="https://www.youtube-nocookie.com/embed/7FMnsdkY6HQ" frameborder="0" allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture" allowfullscreen></iframe>
+</p>
+
+______
+
 ## I. Introduction
 
 Vision-based reinforcement learning and imitation learning methods incorporating deep neural network structure can express complex behaviors, and they solve robotics manipulation tasks in an end-to-end fashion <dt-cite key="levine2018learning,pinto2016supersizing,kalashnikov2018qtopt"></dt-cite>. These methods are able to generalize and scale on complicated robot manipulation tasks, though they require many hundreds of thousands of real world episodes which are costly to collect.
